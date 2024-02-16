@@ -2,24 +2,16 @@ use crate::big_integer::{BigIntChip, BigIntConfig, BigIntInstructions};
 use crate::{
     AggregateExtractionKey, AggregateInstructions, AggregatePublicParams,
     AssignedAggregatePartialKeys, AssignedAggregatePublicParams, AssignedExtractionKey,
-    UnassignedInteger, LIMB_COUNT, LIMB_WIDTH,
+    ExtractionKey, UnassignedInteger, LIMB_COUNT, LIMB_WIDTH,
 };
 use halo2wrong::halo2::plonk::Error;
 use maingate::{decompose_big, MainGate, RangeChip, RegionCtx};
 
 use ff::PrimeField;
-use num_bigint::BigUint;
+// use num_bigint::BigUint;
 
 use super::MAX_SEQUENCER_NUMBER;
 use std::marker::PhantomData;
-
-#[derive(Clone, Debug)]
-pub struct ExtractionKey {
-    pub u: BigUint,
-    pub v: BigUint,
-    pub y: BigUint,
-    pub w: BigUint,
-}
 
 #[derive(Clone, Debug)]
 pub struct DecomposedExtractionKey<F: PrimeField> {
@@ -304,7 +296,7 @@ impl<F: PrimeField> AggregateChip<F> {
 #[cfg(test)]
 mod test {
 
-    use crate::{aggregate, UnassignedInteger, BITS_LEN};
+    use crate::{aggregate, ExtractionKey, UnassignedInteger, BITS_LEN};
 
     use super::*;
     use ff::FromUniformBytes;

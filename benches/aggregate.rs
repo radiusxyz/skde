@@ -107,12 +107,10 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
 
     // set public input
     let combined_partial_limbs: Vec<Fr> =
-        aggregate::chip::ExtractionKey::decompose_and_combine_all_partial_keys(
-            partial_keys.clone(),
-        );
+        skde::ExtractionKey::decompose_and_combine_all_partial_keys(partial_keys.clone());
 
     let decomposed_extraction_key: DecomposedExtractionKey<Fr> =
-        aggregate::chip::ExtractionKey::decompose_extraction_key(&aggregated_key.clone());
+        skde::ExtractionKey::decompose_extraction_key(&aggregated_key.clone());
     let mut combined_limbs = decomposed_extraction_key.combine_limbs();
 
     combined_limbs.extend(combined_partial_limbs);
