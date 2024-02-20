@@ -8,18 +8,13 @@ use num_bigint::{BigUint, RandBigInt};
 use rand::thread_rng;
 use sha2::{Digest, Sha512};
 
-pub const MAX_SEQUENCER_NUMBER: usize = 20;
+pub const MAX_SEQUENCER_NUMBER: usize = 2;
 
 // p * q = 109108784166676529682340577929498188950239585527883687884827626040722072371127456712391033422811328348170518576414206624244823392702116014678887602655605057984874271545556188865755301275371611259397284800785551682318694176857633188036311000733221068448165870969366710007572931433736793827320953175136545355129
 pub const PRIME_P: &str = "8155133734070055735139271277173718200941522166153710213522626777763679009805792017274916613411023848268056376687809186180768200590914945958831360737612803";
 pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
 pub const GENERATOR: &str = "4";
 pub const TIME_PARAM_T: u32 = 4;
-
-// #[derive(Debug, Clone)]
-// pub struct PublicKey {
-//     pub u: BigUint,
-// }
 
 #[derive(Debug, Clone)]
 pub struct ExtractionKey {
@@ -41,8 +36,8 @@ pub struct SecretKey {
 
 #[derive(Debug, Clone)]
 pub struct CipherPair {
-    pub c1: BigUint,
-    pub c2: BigUint,
+    pub c1: String,
+    pub c2: String,
 }
 
 #[derive(Debug, Clone)]
@@ -101,26 +96,6 @@ fn generate_random_biguint(bits_size: u64) -> BigUint {
     rng.gen_biguint(bits_size)
 }
 
-// fn pad_or_trim(value: BigUint, size: usize) -> BigUint {
-//     // BigUint을 바이트 배열로 변환
-//     let mut bytes = value.to_bytes_be();
-
-//     let current_length = bytes.len();
-//     if current_length == size {
-//         // 길이가 정확히 일치하면 변환 없이 바로 반환
-//         value
-//     } else if current_length < size {
-//         // 길이가 더 짧은 경우, 앞쪽을 0으로 패딩
-//         let mut padded_bytes = vec![0u8; size - current_length];
-//         padded_bytes.extend_from_slice(&bytes);
-//         BigUint::from_bytes_be(&padded_bytes)
-//     } else {
-//         // 길이가 더 긴 경우, 앞쪽을 자름
-//         let trimmed_bytes = &bytes[current_length - size..];
-//         BigUint::from_bytes_be(trimmed_bytes)
-//     }
-// }
-
 // Input: (a, b, skde_params = (n, g, t, h))
 // Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
 fn generate_uv_pair(
@@ -151,6 +126,45 @@ fn generate_uv_pair(
         // u: pad_or_trim(u, (2 * lambda / 8) as usize),
         // v: pad_or_trim(v, (2 * lambda / 4) as usize),
     }
+}
+
+fn div_rem(dividend: &BigUint, divisor: &BigUint) -> io::Result<(BigUint, BigUint)> {
+
+        // 나눗셈과 나머지 연산을 수행하여 결과를 Ok로 감싸 반환합니다.
+        let quotient = dividend / divisor;
+        let remainder = dividend % divisor;
+        Ok((quotient, remainder))
+    
+}
+
+fn mod_inverse(a: &BigUint, m: &BigUint) -> Result<BigUint, String> {
+    let zero_big = BigUint::from(0u32);
+    let one_big = BigUint::from(1u32);
+
+    let (mut last_remainder, mut remainder) = (m.clone(), a.clone());
+    let (mut last_x, mut x) = (zero_big.clone(), one_big.clone());
+    let mut result = Err(String::from("No modular inverse"));
+    while remainder != zero_big {
+        let (quotient, new_remainder) = div_rem(&last_remainder,&remainder).unwrap();
+        last_remainder = remainder;
+        remainder = new_remainder;
+
+        let temp = x.clone();
+        if last_x > quotient.clone() * x.clone() {
+        x = last_x - quotient.clone() * x;
+        } else {x = m + last_x - quotient * x}
+        last_x = temp;
+
+        println!("??");
+
+        if last_remainder == one_big {
+            result = Ok(if last_x < zero_big { last_x + m.clone() } else { last_x });
+            break;
+        }
+    }
+
+    // Adjust the result in case it's negative
+    result.map(|r| if r >= *m { r - m.clone() } else { r })
 }
 
 fn prove_key_validity(
@@ -350,11 +364,14 @@ pub fn aggregate_key_pairs(key_pairs: &[ExtractionKey]) -> ExtractionKey {
 
 pub fn encrypt(
     skde_params: &SingleKeyDelayEncryptionParam,
-    message: BigUint,
-    key: PublicKey,
+    message: &str,
+    key: &PublicKey,
 ) -> io::Result<CipherPair> {
     // TODO: Arbitrary Length of Message
-    if message >= skde_params.n {
+    let plain_text = BigUint::from_str(message).map_err(|e| {
+        io::Error::new(ErrorKind::InvalidInput, "Invalid message format")
+    })?;
+    if plain_text >= skde_params.n {
         // std::io::Error
         return Err(io::Error::new(
             ErrorKind::Other,
@@ -368,17 +385,17 @@ pub fn encrypt(
     let l: BigUint = rng.gen_biguint(skde_params.n.bits() / 2);
     let pk_pow_l = big_pow_mod(&key.pk, &l, &skde_params.n);
     let cipher1 = big_pow_mod(&skde_params.g, &l, &skde_params.n);
-    let cipher2 = big_mul_mod(&message, &pk_pow_l, &skde_params.n);
+    let cipher2 = big_mul_mod(&plain_text, &pk_pow_l, &skde_params.n);
 
     Ok(CipherPair {
-        c1: cipher1,
-        c2: cipher2,
+        c1: cipher1.to_str_radix(10),
+        c2: cipher2.to_str_radix(10),
     })
 }
 
 pub fn solve_time_lock_puzzle(
     skde_params: &SingleKeyDelayEncryptionParam,
-    aggregated_key: ExtractionKey,
+    aggregated_key: &ExtractionKey,
 ) -> io::Result<SecretKey> {
     let n_square: BigUint = &skde_params.n * &skde_params.n;
 
@@ -389,8 +406,15 @@ pub fn solve_time_lock_puzzle(
     let u_p = big_mul_mod(&aggregated_key.u, &aggregated_key.y, &skde_params.n);
     let v_p = big_mul_mod(&aggregated_key.v, &aggregated_key.w, &n_square);
     let x = big_pow_mod(&u_p, &time, &skde_params.n);
+    // let x_n = x;
+    // println!("??");
+    let x_inv = mod_inverse(&x, &n_square).unwrap();
+    // println!("??");
+    let x_inv_n = big_pow_mod(&x_inv, &skde_params.n, &n_square);
+    // println!("??");
 
-    let result = v_p / big_pow_mod(&x, &skde_params.n, &(&n_square - &one_big));
+    // let result = v_p / big_pow_mod(&x, &skde_params.n, &(&n_square - &one_big));
+    let result = (v_p * x_inv_n) - &one_big;
 
     if is_divided(&result, &skde_params.n) {
         Ok(SecretKey {
@@ -406,13 +430,14 @@ pub fn solve_time_lock_puzzle(
 
 pub fn decrypt(
     skde_params: &SingleKeyDelayEncryptionParam,
-    cipher_text: CipherPair,
-    secret_key: SecretKey,
-) -> io::Result<BigUint> {
-    let result = cipher_text.c2;
+    cipher_text: &CipherPair,
+    secret_key: &SecretKey,
+) -> io::Result<String> {
+    let cipher1 = BigUint::from_str(&cipher_text.c1).unwrap();
+    let cipher2 = BigUint::from_str(&cipher_text.c2).unwrap();
 
-    if is_divided(&result, &skde_params.n) {
-        Ok(result / &big_pow_mod(&cipher_text.c1, &secret_key.sk, &skde_params.n))
+    if is_divided(&cipher2, &skde_params.n) {
+        Ok((cipher2 / &big_pow_mod(&cipher1, &secret_key.sk, &skde_params.n)).to_str_radix(10))
     } else {
         Err(io::Error::new(ErrorKind::Other, "Result is not an integer"))
     }
@@ -431,22 +456,33 @@ mod tests {
     fn test_encrypt_decrypt() {
 
         let skde_params = setup(TIME_PARAM_T);
-        let d = 10;
+        let mut key_pairs: Vec<ExtractionKey> = Vec::new();
+        let message: &str = "Hi";
 
-        for _ in 0..d {
+        for _ in 0..MAX_SEQUENCER_NUMBER {
             let (extraction_key, key_proof) = key_generation_with_proof(skde_params.clone());
-
             assert!(
                 verify_key_validity(&skde_params, extraction_key, key_proof),
                 "Key verification failed"
             );
         }
-        
+        // Aggregate all generated keys
+        let aggregated_key = aggregate_key_pairs(&key_pairs);
 
+        let public_key = PublicKey { pk: aggregated_key.u.clone() };
+
+        let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
+
+        let cipher_text = encrypt(&skde_params, message, &public_key).unwrap();
+
+        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key).unwrap();
         // let cipher_pair = encrypt(&skde_params, message.clone(), public_key).expect("Encryption failed");
         
         // let decrypted_message = decrypt(&skde_params, cipher_pair, secret_key).expect("Decryption failed");
 
-        // assert_eq!(message, decrypted_message, "Decrypted message does not match the original message");
+        println!("{:?}", decrypted_message);
+        // "Decrypted message does not match the original message");
     }
+
+    
 }
