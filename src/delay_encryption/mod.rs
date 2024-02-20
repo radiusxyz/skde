@@ -140,10 +140,10 @@ fn generate_uv_pair(
     // U = g^r mod n
     let u = big_pow_mod(&g, &a, &n);
     // h_exp_r = h^r mod n, h_exp_rn = h^(r * n) mod n^2
-    let h_exp_r = big_pow_mod(&h, &a, &n);
-    let h_exp_rn = big_pow_mod(&h_exp_r, &n, &n_square);
+    let h_exp_a = big_pow_mod(&h, &a, &n);
+    let h_exp_an = big_pow_mod(&h_exp_a, &n, &n_square);
     // V = (n+1)^s * hrn mod n^2
-    let v = (&big_pow_mod(&n_plus_one, &b, &n_square) * &h_exp_rn) % &n_square;
+    let v = (&big_pow_mod(&n_plus_one, &b, &n_square) * &h_exp_an) % &n_square;
 
     UVPair {
         u: u,
@@ -187,7 +187,7 @@ fn prove_key_validity(
     let e = calculate_challenge(&transcript);
 
     let alpha = (r + s + k) * &e + &x;
-    let beta = (r + s) * &e + &skde_params.t;
+    let beta = (r + s) * &e + &l;
 
     KeyProof {
         a,
@@ -223,7 +223,7 @@ pub fn setup(t: u32) -> SingleKeyDelayEncryptionParam {
 pub fn key_generation_with_proof(
     skde_params: SingleKeyDelayEncryptionParam,
 ) -> (ExtractionKey, KeyProof) {
-    let two_big: BigUint = BigUint::from_str("2").expect("Invalid TWO");
+    let two_big: BigUint = BigUint::from(2u32);
 
     let n_half: BigUint = &skde_params.n / two_big;
     // let n_over_m: BigUint = &n / m;
@@ -253,7 +253,6 @@ pub fn key_generation_with_proof(
 }
 
 // let n_over_m: BigUint = &n / m;
-// let two_big: BigUint = BigUint::from_str("2").expect("Invalid TWO");
 // let n_half: BigUint = &skde_params.n / two_big;
 // let n_half_over_m: BigUint = &n_half / MAX_SEQUENCER_NUMBER;
 // let lambda: u32 = (n_half.bits() as u32) + 1;
@@ -268,6 +267,8 @@ fn verify_key_validity(
 ) -> bool {
     let t = BigUint::from(skde_params.t.clone());
     let n_square: BigUint = &skde_params.n * &skde_params.n;
+
+    let one_big = BigUint::from(1u32);
 
     let a: BigUint = key_proof.a;
     let b: BigUint = key_proof.b;
@@ -295,9 +296,12 @@ fn verify_key_validity(
 
     let e = calculate_challenge(&transcript);
 
+    let h_exp_nalpha = big_pow_mod(&skde_params.h, &(&alpha * &skde_params.n), &n_square);
+    let n_plus_one_exp_beta = big_pow_mod(&(&skde_params.n+&one_big), &beta, &n_square);
+
     let lhs = vec![
         big_pow_mod(&skde_params.g, &alpha, &skde_params.n),
-        big_pow_mod(&skde_params.h, &(&a * &skde_params.n), &n_square),
+        big_mul_mod(&h_exp_nalpha, &n_plus_one_exp_beta, &n_square),
         big_pow_mod(&skde_params.g, &beta, &skde_params.n),
     ];
 
@@ -309,6 +313,9 @@ fn verify_key_validity(
         big_mul_mod(&big_pow_mod(&vw, &e, &n_square), &b, &n_square),
         big_mul_mod(&big_pow_mod(u, &e, &skde_params.n), &tau, &skde_params.n),
     ];
+
+    println!("lhs: {:?}", lhs);
+    println!("rhs: {:?}", rhs);
     let verified = lhs.iter().zip(rhs.iter()).all(|(l, r)| l == r);
 
     println!(
@@ -435,14 +442,6 @@ mod tests {
             );
         }
         
-
-        // let public_key = PublicKey {
-        //     pk: BigUint::from_str("7").unwrap(),
-        // };
-        // let secret_key = SecretKey {
-        //     sk: BigUint::from_str("23").unwrap(), // 예시 값
-        // };
-        // let message = BigUint::from_str("20").unwrap(); // 암호화할 메시지
 
         // let cipher_pair = encrypt(&skde_params, message.clone(), public_key).expect("Encryption failed");
         
