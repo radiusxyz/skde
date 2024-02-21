@@ -14,9 +14,9 @@ pub const MAX_SEQUENCER_NUMBER: usize = 20;
 #[derive(Clone, Debug)]
 pub struct AggregateExtractionKey<F: PrimeField> {
     pub u: UnassignedInteger<F>,
-    pub v: UnassignedInteger<F>,
-    pub y: UnassignedInteger<F>,
-    pub w: UnassignedInteger<F>,
+    // pub v: UnassignedInteger<F>,
+    // pub y: UnassignedInteger<F>,
+    // pub w: UnassignedInteger<F>,
 }
 
 impl<F: PrimeField> AggregateExtractionKey<F> {
@@ -32,11 +32,12 @@ impl<F: PrimeField> AggregateExtractionKey<F> {
     /// Returns new [`AggregateExtractionKey`].
     pub fn new(
         u: UnassignedInteger<F>,
-        v: UnassignedInteger<F>,
-        y: UnassignedInteger<F>,
-        w: UnassignedInteger<F>,
+        // v: UnassignedInteger<F>,
+        // y: UnassignedInteger<F>,
+        // w: UnassignedInteger<F>,
     ) -> Self {
-        Self { u, v, y, w }
+        // Self { u, v, y, w }
+        Self { u }
     }
 
     pub fn without_witness(num_limbs: usize) -> Self {
@@ -44,19 +45,20 @@ impl<F: PrimeField> AggregateExtractionKey<F> {
             value: Value::unknown(),
             num_limbs,
         };
-        let v = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        let y = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        let w = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        Self { u, v, y, w }
+        // let v = UnassignedInteger {
+        //     value: Value::unknown(),
+        //     num_limbs,
+        // };
+        // let y = UnassignedInteger {
+        //     value: Value::unknown(),
+        //     num_limbs,
+        // };
+        // let w = UnassignedInteger {
+        //     value: Value::unknown(),
+        //     num_limbs,
+        // };
+        // Self { u, v, y, w }
+        Self { u }
     }
 }
 
@@ -64,9 +66,9 @@ impl<F: PrimeField> AggregateExtractionKey<F> {
 #[derive(Clone, Debug)]
 pub struct AssignedAggregateExtractionKey<F: PrimeField> {
     pub u: AssignedInteger<F, Fresh>,
-    pub v: AssignedInteger<F, Fresh>,
-    pub y: AssignedInteger<F, Fresh>,
-    pub w: AssignedInteger<F, Fresh>,
+    // pub v: AssignedInteger<F, Fresh>,
+    // pub y: AssignedInteger<F, Fresh>,
+    // pub w: AssignedInteger<F, Fresh>,
 }
 
 impl<F: PrimeField> AssignedAggregateExtractionKey<F> {
@@ -82,11 +84,12 @@ impl<F: PrimeField> AssignedAggregateExtractionKey<F> {
     /// Returns new [`AssignedAggregateExtractionKey`].
     pub fn new(
         u: AssignedInteger<F, Fresh>,
-        v: AssignedInteger<F, Fresh>,
-        y: AssignedInteger<F, Fresh>,
-        w: AssignedInteger<F, Fresh>,
+        // v: AssignedInteger<F, Fresh>,
+        // y: AssignedInteger<F, Fresh>,
+        // w: AssignedInteger<F, Fresh>,
     ) -> Self {
-        Self { u, v, y, w }
+        // Self { u, v, y, w }
+        Self { u }
     }
 }
 
@@ -95,7 +98,7 @@ impl<F: PrimeField> AssignedAggregateExtractionKey<F> {
 pub struct AggregatePublicParams<F: PrimeField> {
     /// a modulus parameter
     pub n: UnassignedInteger<F>,
-    pub n_square: UnassignedInteger<F>,
+    // pub n_square: UnassignedInteger<F>,
 }
 
 impl<F: PrimeField> AggregatePublicParams<F> {
@@ -106,8 +109,11 @@ impl<F: PrimeField> AggregatePublicParams<F> {
     ///
     /// # Return values
     /// Returns new [`AggregatePublicParams`].
-    pub fn new(n: UnassignedInteger<F>, n_square: UnassignedInteger<F>) -> Self {
-        Self { n, n_square }
+    // pub fn new(n: UnassignedInteger<F>, n_square: UnassignedInteger<F>) -> Self {
+    //     Self { n, n_square }
+    // }
+    pub fn new(n: UnassignedInteger<F>) -> Self {
+        Self { n }
     }
 
     pub fn without_witness(num_limbs: usize) -> Self {
@@ -115,12 +121,13 @@ impl<F: PrimeField> AggregatePublicParams<F> {
             value: Value::unknown(),
             num_limbs,
         };
-        let num_limb2 = num_limbs * 2;
-        let n_square = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs: num_limb2,
-        };
-        Self { n, n_square }
+        // let num_limb2 = num_limbs * 2;
+        // let n_square = UnassignedInteger {
+        //     value: Value::unknown(),
+        //     num_limbs: num_limb2,
+        // };
+        // Self { n, n_square }
+        Self { n }
     }
 }
 
@@ -129,7 +136,7 @@ impl<F: PrimeField> AggregatePublicParams<F> {
 pub struct AssignedAggregatePublicParams<F: PrimeField> {
     /// a modulus parameter
     pub n: AssignedInteger<F, Fresh>,
-    pub n_square: AssignedInteger<F, Fresh>,
+    // pub n_square: AssignedInteger<F, Fresh>,
 }
 
 impl<F: PrimeField> AssignedAggregatePublicParams<F> {
@@ -140,8 +147,11 @@ impl<F: PrimeField> AssignedAggregatePublicParams<F> {
     ///
     /// # Return values
     /// Returns new [`AssignedAggregatePublicParams`].
-    pub fn new(n: AssignedInteger<F, Fresh>, n_square: AssignedInteger<F, Fresh>) -> Self {
-        Self { n, n_square }
+    // pub fn new(n: AssignedInteger<F, Fresh>, n_square: AssignedInteger<F, Fresh>) -> Self {
+    //     Self { n, n_square }
+    // }
+    pub fn new(n: AssignedInteger<F, Fresh>) -> Self {
+        Self { n }
     }
 }
 

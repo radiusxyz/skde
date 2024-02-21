@@ -55,41 +55,41 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
     while n.bits() != bits_len {
         n = rng.sample(RandomBits::new(bits_len));
     }
-    let n_square = &n * &n;
+    // let n_square = &n * &n;
 
     let mut partial_keys = vec![];
 
     let mut aggregated_key = ExtractionKey {
         u: BigUint::from(1usize),
-        v: BigUint::from(1usize),
-        y: BigUint::from(1usize),
-        w: BigUint::from(1usize),
+        // v: BigUint::from(1usize),
+        // y: BigUint::from(1usize),
+        // w: BigUint::from(1usize),
     };
 
     for _ in 0..AggregateCircuit::<Fr>::MAX_SEQUENCER_NUMBER {
         let u = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
-        let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
-        let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
-        let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
+        // let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
+        // let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
+        // let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
 
         partial_keys.push(ExtractionKey {
             u: u.clone(),
-            v: v.clone(),
-            y: y.clone(),
-            w: w.clone(),
+            // v: v.clone(),
+            // y: y.clone(),
+            // w: w.clone(),
         });
 
         aggregated_key.u = aggregated_key.u * &u % &n;
-        aggregated_key.v = aggregated_key.v * &v % &n_square;
-        aggregated_key.y = aggregated_key.y * &y % &n;
-        aggregated_key.w = aggregated_key.w * &w % &n_square;
+        // aggregated_key.v = aggregated_key.v * &v % &n_square;
+        // aggregated_key.y = aggregated_key.y * &y % &n;
+        // aggregated_key.w = aggregated_key.w * &w % &n_square;
     }
 
     let circuit = AggregateCircuit::<Fr> {
         partial_keys,
         aggregated_key,
         n,
-        n_square,
+        // n_square,
         _f: PhantomData,
     };
 
@@ -191,7 +191,7 @@ fn main() {
         .nresamples(10); // # of iteration
 
     let benches: Vec<Box<dyn Fn(&mut Criterion)>> =
-        vec![Box::new(|c| bench_aggregate::<20>("skde aggregate", c))];
+        vec![Box::new(|c| bench_aggregate::<17>("skde aggregate", c))];
 
     for bench in benches {
         bench(&mut criterion);
