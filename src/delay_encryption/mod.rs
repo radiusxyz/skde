@@ -1,10 +1,10 @@
 use std::{
     io::{self, ErrorKind},
+    ops::{Div, Mul, Rem, Sub},
     str::FromStr,
 };
 
-// use num_bigint::{BigInt, ToBigInt};
-use num_bigint::{BigUint, RandBigInt};
+use num_bigint::{BigInt, BigUint, RandBigInt};
 use rand::thread_rng;
 use sha2::{Digest, Sha512};
 
@@ -122,49 +122,44 @@ fn generate_uv_pair(
 
     UVPair {
         u: u,
-        v: v
-        // u: pad_or_trim(u, (2 * lambda / 8) as usize),
-        // v: pad_or_trim(v, (2 * lambda / 4) as usize),
+        v: v, // u: pad_or_trim(u, (2 * lambda / 8) as usize),
+              // v: pad_or_trim(v, (2 * lambda / 4) as usize),
     }
 }
 
-fn div_rem(dividend: &BigUint, divisor: &BigUint) -> io::Result<(BigUint, BigUint)> {
+fn big_mod_inv(a: &BigUint, m: &BigUint) -> Option<BigUint> {
+    let mut m0: BigInt = m.clone().into();
+    let mut a0: BigInt = a.clone().into();
+    let m_int: BigInt = m.clone().into();
+    let zero = BigUint::from(0u32);
+    let one = BigUint::from(1u32);
+    let mut x0: BigInt = zero.clone().into();
+    let mut inv: BigInt = one.clone().into();
 
-        // 나눗셈과 나머지 연산을 수행하여 결과를 Ok로 감싸 반환합니다.
-        let quotient = dividend / divisor;
-        let remainder = dividend % divisor;
-        Ok((quotient, remainder))
-    
-}
-
-fn mod_inverse(a: &BigUint, m: &BigUint) -> Result<BigUint, String> {
-    let zero_big = BigUint::from(0u32);
-    let one_big = BigUint::from(1u32);
-
-    let (mut last_remainder, mut remainder) = (m.clone(), a.clone());
-    let (mut last_x, mut x) = (zero_big.clone(), one_big.clone());
-    let mut result = Err(String::from("No modular inverse"));
-    while remainder != zero_big {
-        let (quotient, new_remainder) = div_rem(&last_remainder,&remainder).unwrap();
-        last_remainder = remainder;
-        remainder = new_remainder;
-
-        let temp = x.clone();
-        if last_x > quotient.clone() * x.clone() {
-        x = last_x - quotient.clone() * x;
-        } else {x = m + last_x - quotient * x}
-        last_x = temp;
-
-        println!("??");
-
-        if last_remainder == one_big {
-            result = Ok(if last_x < zero_big { last_x + m.clone() } else { last_x });
-            break;
-        }
+    if m == &one {
+        return Some(zero);
     }
 
-    // Adjust the result in case it's negative
-    result.map(|r| if r >= *m { r - m.clone() } else { r })
+    while a0 > one.clone().into() {
+        let q: BigInt = (a0.clone() / m0.clone()).into();
+
+        let mut temp: BigInt = m0.clone();
+
+        m0 = a0.clone() % m0.clone();
+        a0 = temp;
+
+        temp = x0.clone();
+
+        // Update x0 and inv
+        x0 = inv.clone() - q.clone() * x0;
+        inv = temp;
+    }
+
+    // Make inv positive
+    if inv < zero.into() {
+        inv = inv + m_int;
+    }
+    inv.to_biguint()
 }
 
 fn prove_key_validity(
@@ -266,14 +261,6 @@ pub fn key_generation_with_proof(
     )
 }
 
-// let n_over_m: BigUint = &n / m;
-// let n_half: BigUint = &skde_params.n / two_big;
-// let n_half_over_m: BigUint = &n_half / MAX_SEQUENCER_NUMBER;
-// let lambda: u32 = (n_half.bits() as u32) + 1;
-// 2^{2^{lambda}}
-// let g_exp_2_lambda = repeat_square_mod(&g, lambda, &n);
-// 2^{2^{lambda} + 1}
-// let g_exp_2_lambda_plus = repeat_square_mod(&g_exp_2_lambda, 1, &n);
 fn verify_key_validity(
     skde_params: &SingleKeyDelayEncryptionParam,
     extraction_key: ExtractionKey,
@@ -311,7 +298,7 @@ fn verify_key_validity(
     let e = calculate_challenge(&transcript);
 
     let h_exp_nalpha = big_pow_mod(&skde_params.h, &(&alpha * &skde_params.n), &n_square);
-    let n_plus_one_exp_beta = big_pow_mod(&(&skde_params.n+&one_big), &beta, &n_square);
+    let n_plus_one_exp_beta = big_pow_mod(&(&skde_params.n + &one_big), &beta, &n_square);
 
     let lhs = vec![
         big_pow_mod(&skde_params.g, &alpha, &skde_params.n),
@@ -328,29 +315,33 @@ fn verify_key_validity(
         big_mul_mod(&big_pow_mod(u, &e, &skde_params.n), &tau, &skde_params.n),
     ];
 
-    println!("lhs: {:?}", lhs);
-    println!("rhs: {:?}", rhs);
+    // println!("lhs: {:?}", lhs);
+    // println!("rhs: {:?}", rhs);
     let verified = lhs.iter().zip(rhs.iter()).all(|(l, r)| l == r);
 
-    println!(
-        "Are all corresponding elements in lhs and rhs equal? {}",
-        verified
-    );
+    // println!(
+    //     "Are all corresponding elements in lhs and rhs equal? {}",
+    //     verified
+    // );
 
     verified
 }
 
-pub fn aggregate_key_pairs(key_pairs: &[ExtractionKey]) -> ExtractionKey {
+pub fn aggregate_key_pairs(
+    key_pairs: &[ExtractionKey],
+    skde_params: &SingleKeyDelayEncryptionParam,
+) -> ExtractionKey {
+    let n_square = &skde_params.n * &skde_params.n;
     let mut aggregated_u = BigUint::from(1u32);
     let mut aggregated_v = BigUint::from(1u32);
     let mut aggregated_y = BigUint::from(1u32);
     let mut aggregated_w = BigUint::from(1u32);
     // Multiply each component of each ExtractionKey in the array
     for key in key_pairs {
-        aggregated_u *= &key.u;
-        aggregated_v *= &key.v;
-        aggregated_y *= &key.y;
-        aggregated_w *= &key.w;
+        aggregated_u = big_mul_mod(&aggregated_u, &key.u, &skde_params.n);
+        aggregated_v = big_mul_mod(&aggregated_v, &key.v, &n_square);
+        aggregated_y = big_mul_mod(&aggregated_y, &key.y, &skde_params.n);
+        aggregated_w = big_mul_mod(&aggregated_w, &key.w, &n_square);
     }
 
     // Create a new ExtractionKey instance with the calculated results
@@ -368,9 +359,7 @@ pub fn encrypt(
     key: &PublicKey,
 ) -> io::Result<CipherPair> {
     // TODO: Arbitrary Length of Message
-    let plain_text = BigUint::from_str(message).map_err(|e| {
-        io::Error::new(ErrorKind::InvalidInput, "Invalid message format")
-    })?;
+    let plain_text = BigUint::from_str(message).expect("Invalid message");
     if plain_text >= skde_params.n {
         // std::io::Error
         return Err(io::Error::new(
@@ -406,15 +395,10 @@ pub fn solve_time_lock_puzzle(
     let u_p = big_mul_mod(&aggregated_key.u, &aggregated_key.y, &skde_params.n);
     let v_p = big_mul_mod(&aggregated_key.v, &aggregated_key.w, &n_square);
     let x = big_pow_mod(&u_p, &time, &skde_params.n);
-    // let x_n = x;
-    // println!("??");
-    let x_inv = mod_inverse(&x, &n_square).unwrap();
-    // println!("??");
-    let x_inv_n = big_pow_mod(&x_inv, &skde_params.n, &n_square);
-    // println!("??");
-
-    // let result = v_p / big_pow_mod(&x, &skde_params.n, &(&n_square - &one_big));
-    let result = (v_p * x_inv_n) - &one_big;
+    let x_pow_n = x.modpow(&skde_params.n, &n_square);
+    let x_pow_n_inv = big_mod_inv(&x_pow_n, &n_square).unwrap();
+    let result = big_mul_mod(&v_p, &x_pow_n_inv, &n_square);
+    let result = result - &one_big;
 
     if is_divided(&result, &skde_params.n) {
         Ok(SecretKey {
@@ -436,11 +420,13 @@ pub fn decrypt(
     let cipher1 = BigUint::from_str(&cipher_text.c1).unwrap();
     let cipher2 = BigUint::from_str(&cipher_text.c2).unwrap();
 
-    if is_divided(&cipher2, &skde_params.n) {
-        Ok((cipher2 / &big_pow_mod(&cipher1, &secret_key.sk, &skde_params.n)).to_str_radix(10))
-    } else {
-        Err(io::Error::new(ErrorKind::Other, "Result is not an integer"))
-    }
+    let exponentiation = big_pow_mod(&cipher1, &secret_key.sk, &skde_params.n);
+
+    let inv_mod = big_mod_inv(&exponentiation, &skde_params.n)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "No modular inverse found"))?;
+    let result = (cipher2 * inv_mod) % &skde_params.n;
+
+    Ok(result.to_str_radix(10))
 }
 
 #[cfg(test)]
@@ -453,36 +439,42 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt() {
-
+    fn test_signle_key_delay_encryption() {
         let skde_params = setup(TIME_PARAM_T);
         let mut key_pairs: Vec<ExtractionKey> = Vec::new();
-        let message: &str = "Hi";
+        let message: &str = "12345";
 
         for _ in 0..MAX_SEQUENCER_NUMBER {
             let (extraction_key, key_proof) = key_generation_with_proof(skde_params.clone());
             assert!(
-                verify_key_validity(&skde_params, extraction_key, key_proof),
+                verify_key_validity(&skde_params, extraction_key.clone(), key_proof),
                 "Key verification failed"
             );
+            key_pairs.push(extraction_key);
         }
         // Aggregate all generated keys
-        let aggregated_key = aggregate_key_pairs(&key_pairs);
+        let aggregated_key = aggregate_key_pairs(&key_pairs, &skde_params);
+        println!("aggregated key: {:?}", aggregated_key);
 
-        let public_key = PublicKey { pk: aggregated_key.u.clone() };
+        let public_key = PublicKey {
+            pk: aggregated_key.u.clone(),
+        };
 
         let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
 
+        println!("Puzzle solved!: {:?}", secret_key);
+
         let cipher_text = encrypt(&skde_params, message, &public_key).unwrap();
 
+        println!("Encryption Result: {:?}", cipher_text);
+
         let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key).unwrap();
-        // let cipher_pair = encrypt(&skde_params, message.clone(), public_key).expect("Encryption failed");
-        
-        // let decrypted_message = decrypt(&skde_params, cipher_pair, secret_key).expect("Decryption failed");
 
-        println!("{:?}", decrypted_message);
-        // "Decrypted message does not match the original message");
+        println!("decrypted_message: {:?}", decrypted_message);
+
+        assert_eq!(
+            message, decrypted_message,
+            "Decrypted message does not same with the original message"
+        );
     }
-
-    
 }
