@@ -1,9 +1,11 @@
 use crate::big_integer::{BigIntChip, BigIntConfig, BigIntInstructions};
+use crate::hash::chip::HasherChip;
 use crate::poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
 use crate::{
-    AggregateExtractionKey, AggregateInstructions, AggregatePublicParams, AssignedAggregateExtractionKey, AssignedAggregatePartialKeys, AssignedAggregatePublicParams, PoseidonChip, Spec
+    AggregateExtractionKey, AggregateInstructions, AggregatePublicParams,
+    AssignedAggregateExtractionKey, AssignedAggregatePartialKeys, AssignedAggregatePublicParams,
+    PoseidonChip, Spec,
 };
-use crate::hash::chip::HasherChip;
 use halo2wrong::halo2::plonk::Error;
 use maingate::{MainGate, MainGateConfig, RangeChip, RegionCtx};
 
@@ -30,7 +32,7 @@ pub struct AggregateConfig {
     // pub bigint_square_config: BigIntConfig,
     // instance: Column<Instance>,
     // Hash
-    hash_config: MainGateConfig,
+    pub hash_config: MainGateConfig,
 }
 
 impl AggregateConfig {
@@ -43,7 +45,6 @@ impl AggregateConfig {
     /// Returns new [`AggregateConfig`].
     // pub fn new(bigint_config: BigIntConfig, bigint_square_config: BigIntConfig) -> Self {
     pub fn new(bigint_config: BigIntConfig, hash_config: MainGateConfig) -> Self {
-
         Self {
             bigint_config,
             // bigint_square_config,
@@ -60,7 +61,9 @@ pub struct AggregateChip<F: PrimeField + FromUniformBytes<64>, const T: usize, c
     _f: PhantomData<F>,
 }
 
-impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> AggregateInstructions<F> for AggregateChip<F, T, RATE> {
+impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
+    AggregateInstructions<F> for AggregateChip<F, T, RATE>
+{
     /// Assigns a [`AssignedAggregatePublicKey`].
     ///
     /// # Arguments
@@ -83,7 +86,6 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ag
         // let w = bigint_square_chip.assign_integer(ctx, extraction_key.w)?;
         // Ok(AssignedAggregateExtractionKey::new(u, v, y, w))
         Ok(AssignedAggregateExtractionKey::new(u))
-
     }
 
     /// Assigns a [`AssignedAggregatePublicParams`].
@@ -106,7 +108,6 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ag
         // let n_square = bigint_square_chip.assign_integer(ctx, public_params.n_square)?;
         // Ok(AssignedAggregatePublicParams::new(n, n_square))
         Ok(AssignedAggregatePublicParams::new(n))
-
     }
 
     /// Given a base `x`, a Aggregate public key (e,n), performs the modular power `x^e mod n`.
@@ -164,7 +165,9 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ag
     }
 }
 
-impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> AggregateChip<F, T, RATE> {
+impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
+    AggregateChip<F, T, RATE>
+{
     pub const LIMB_WIDTH: usize = 64;
 
     /// Create a new [`AggregateChip`] from the configuration and parameters.
@@ -184,12 +187,8 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ag
         }
     }
 
-    pub fn new_bigint(config: BigIntConfig, bits_len: usize) -> BigIntChip<F>{
-        BigIntChip::<F>::new(
-            config,
-            Self::LIMB_WIDTH,
-            bits_len,
-        )
+    pub fn new_bigint(config: BigIntConfig, bits_len: usize) -> BigIntChip<F> {
+        BigIntChip::<F>::new(config, Self::LIMB_WIDTH, bits_len)
     }
 
     pub fn new_hash(
@@ -427,7 +426,6 @@ mod test {
             config: Self::Config,
             mut layouter: impl halo2wrong::halo2::circuit::Layouter<F>,
         ) -> Result<(), Error> {
-            
             let limb_width = Self::LIMB_WIDTH;
             let num_limbs = Self::BITS_LEN / Self::LIMB_WIDTH;
             let aggregate_chip = self.aggregate_chip(config.clone());
@@ -456,14 +454,17 @@ mod test {
                 },
             )?;
 
-                // let h_spec = Spec::<F, T, RATE>::new(8, 57);
+            // let h_spec = Spec::<F, T, RATE>::new(8, 57);
             layouter.assign_region(
                 || "hash mapping from 2048bit",
                 |region| {
                     let offset = 0;
                     let ctx = &mut RegionCtx::new(region, offset);
-                    let mut hasher =
-                        AggregateChip::<F, T, RATE>::new_hash(ctx, &self.spec, &config.hash_config.clone())?;
+                    let mut hasher = AggregateChip::<F, T, RATE>::new_hash(
+                        ctx,
+                        &self.spec,
+                        &config.hash_config.clone(),
+                    )?;
 
                     let base1 = main_gate_chip.assign_constant(
                         ctx,
@@ -558,7 +559,8 @@ mod test {
                         // //     y_unassigned,
                         // //     w_unassigned,
                         // );
-                        let assigned_extraction_key = AssignedAggregateExtractionKey::new(u_out[i].clone());
+                        let assigned_extraction_key =
+                            AssignedAggregateExtractionKey::new(u_out[i].clone());
                         // let assigned_extraction_key = aggregate_chip.assign_extraction_key(ctx, extraction_key_unassgined)?;
                         partial_keys_assigned.push(
                             assigned_extraction_key,

@@ -16,7 +16,8 @@ use halo2wrong::halo2::{
     transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
     SerdeFormat,
 };
-use skde::{AggregateCircuit, ExtractionKey};
+use maingate::{big_to_fe, decompose_big};
+use skde::{AggregateCircuit, ExtractionKey, Poseidon};
 
 use num_bigint::{BigUint, RandomBits};
 use rand::{thread_rng, Rng};
@@ -48,9 +49,12 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
     let params_fs = File::open(params_path).expect("Failed to load params");
     let params =
         ParamsKZG::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
+    let bits_len = AggregateCircuit::<Fr, 5, 4>::BITS_LEN as u64;
+    let limb_width = AggregateCircuit::<Fr, 5, 4>::LIMB_WIDTH as usize;
+    let num_limbs = bits_len as usize / limb_width;
 
     let mut rng = thread_rng();
-    let bits_len = AggregateCircuit::<Fr>::BITS_LEN as u64;
+    let bits_len = AggregateCircuit::<Fr, 5, 4>::BITS_LEN as u64;
     let mut n = BigUint::default();
     while n.bits() != bits_len {
         n = rng.sample(RandomBits::new(bits_len));
@@ -66,12 +70,33 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
         // w: BigUint::from(1usize),
     };
 
-    for _ in 0..AggregateCircuit::<Fr>::MAX_SEQUENCER_NUMBER {
+    let mut ref_hasher = Poseidon::<Fr, 5, 4>::new_hash(8, 57);
+    let base1: Fr = big_to_fe(BigUint::from(
+        2_u128.pow((limb_width as u128).try_into().unwrap()),
+    ));
+    let base2: Fr = base1 * &base1;
+
+    let mut hashes = vec![];
+
+    for _ in 0..AggregateCircuit::<Fr, 5, 4>::MAX_SEQUENCER_NUMBER {
         let u = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
         // let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
         // let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
         // let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
 
+        let u_limbs = decompose_big::<Fr>(u.clone(), num_limbs, limb_width);
+        for i in 0..(num_limbs / 3) {
+            let mut u_compose = u_limbs[3 * i];
+            u_compose += base1 * &u_limbs[3 * i + 1];
+            u_compose += base2 * &u_limbs[3 * i + 2];
+            ref_hasher.update(&[u_compose]);
+        }
+        let mut u_compose = u_limbs[30];
+        u_compose += base1 * &u_limbs[31];
+        let e = u_compose;
+        ref_hasher.update(&[e.clone()]);
+
+        hashes.push(ref_hasher.squeeze(1));
         partial_keys.push(ExtractionKey {
             u: u.clone(),
             // v: v.clone(),
@@ -85,10 +110,11 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
         // aggregated_key.w = aggregated_key.w * &w % &n_square;
     }
 
-    let circuit = AggregateCircuit::<Fr> {
+    let circuit = AggregateCircuit::<Fr, 5, 4> {
         partial_keys,
         aggregated_key,
         n,
+        hashes,
         // n_square,
         _f: PhantomData,
     };
@@ -104,7 +130,7 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
             .expect("Failed to write vk to file");
     }
     let vk_fs = File::open(vk_path).expect("Failed to load vk");
-    let vk = VerifyingKey::<G1Affine>::read::<BufReader<File>, AggregateCircuit<Fr>>(
+    let vk = VerifyingKey::<G1Affine>::read::<BufReader<File>, AggregateCircuit<Fr, 5, 4>>(
         &mut BufReader::new(vk_fs),
         SerdeFormat::RawBytes,
     )
@@ -121,7 +147,7 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
             .expect("Failed to write pk to file");
     }
     let pk_fs = File::open(pk_path).expect("Failed to load pk");
-    let pk = ProvingKey::<G1Affine>::read::<BufReader<File>, AggregateCircuit<Fr>>(
+    let pk = ProvingKey::<G1Affine>::read::<BufReader<File>, AggregateCircuit<Fr, 5, 4>>(
         &mut BufReader::new(pk_fs),
         SerdeFormat::RawBytes,
     )
