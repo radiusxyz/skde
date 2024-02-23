@@ -4,7 +4,7 @@ use crate::{
     AssignedInteger, AssignedLimb, BigIntInstructions, Fresh, Muled, RangeType, RefreshAux,
     UnassignedInteger,
 };
-use halo2wrong::halo2::{arithmetic::Field, circuit::Value, plonk::Error};
+use halo2wrong::halo2::{circuit::Value, plonk::Error};
 use maingate::{
     big_to_fe, decompose_big, fe_to_big, AssignedValue, MainGate, MainGateConfig,
     MainGateInstructions, RangeChip, RangeConfig, RangeInstructions, RegionCtx,
@@ -150,7 +150,7 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         let main_gate = self.main_gate();
         // Each limb of the new integer is `limb_max`.
         for _ in 0..num_limbs {
-            let val = main_gate.assign_constant(ctx, limb_max.clone())?;
+            let val = main_gate.assign_constant(ctx, limb_max)?;
             limbs.push(AssignedLimb::from(val));
         }
         Ok(AssignedInteger::new(&limbs))
@@ -1335,8 +1335,8 @@ impl<F: PrimeField> BigIntChip<F> {
             .value()
             .zip(n.value())
             .map(|(a, n)| {
-                let a_big = fe_to_big(a.clone());
-                let n_big = fe_to_big(n.clone());
+                let a_big = fe_to_big(*a);
+                let n_big = fe_to_big(*n);
                 let q_big = &a_big / &n_big;
                 let a_mod_n_big = &a_big % &n_big;
                 (big_to_fe::<F>(q_big), big_to_fe::<F>(a_mod_n_big))
@@ -1381,7 +1381,7 @@ mod test {
     use std::str::FromStr;
 
     //zeroknight
-    use ff::FromUniformBytes;
+    use ff::{FromUniformBytes, Field};
 
     use super::*;
     use crate::big_pow_mod;
