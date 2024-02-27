@@ -1381,7 +1381,7 @@ mod test {
     use std::str::FromStr;
 
     //zeroknight
-    use ff::{FromUniformBytes, Field};
+    use ff::{Field, FromUniformBytes};
 
     use super::*;
     use crate::big_pow_mod;
