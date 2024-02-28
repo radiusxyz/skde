@@ -2,6 +2,12 @@ pub mod big_integer;
 pub use big_integer::*;
 pub mod aggregate;
 pub use crate::aggregate::*;
+pub mod aggregate_with_hash;
+pub use crate::aggregate_with_hash::*;
+pub mod poseidon;
+pub use crate::poseidon::*;
+pub mod hash;
+pub use crate::hash::*;
 use ff::PrimeField;
 use halo2wrong::{
     halo2::{
