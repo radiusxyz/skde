@@ -37,7 +37,6 @@ impl<F: PrimeField> AggregateWithHashExtractionKey<F> {
         w: UnassignedInteger<F>,
     ) -> Self {
         Self { u, v, y, w }
-        // Self { u }
     }
 
     pub fn without_witness(num_limbs: usize) -> Self {
@@ -58,7 +57,6 @@ impl<F: PrimeField> AggregateWithHashExtractionKey<F> {
             num_limbs,
         };
         Self { u, v, y, w }
-        // Self { u }
     }
 }
 
@@ -89,11 +87,10 @@ impl<F: PrimeField> AssignedAggregateWithHashExtractionKey<F> {
         w: AssignedInteger<F, Fresh>,
     ) -> Self {
         Self { u, v, y, w }
-        // Self { u }
     }
 }
 
-/// AggregateWithHash public key that is about to be assigned.
+/// Public Parameters that is about to be assigned.
 #[derive(Clone, Debug)]
 pub struct AggregateWithHashPublicParams<F: PrimeField> {
     /// a modulus parameter
@@ -106,15 +103,13 @@ impl<F: PrimeField> AggregateWithHashPublicParams<F> {
     ///
     /// # Arguments
     /// * n - an integer of `n`.
+    /// * n_square - an integer of `n^2`.
     ///
     /// # Return values
     /// Returns new [`AggregateWithHashPublicParams`].
     pub fn new(n: UnassignedInteger<F>, n_square: UnassignedInteger<F>) -> Self {
         Self { n, n_square }
     }
-    // pub fn new(n: UnassignedInteger<F>) -> Self {
-    //     Self { n }
-    // }
 
     pub fn without_witness(num_limbs: usize) -> Self {
         let n = UnassignedInteger {
@@ -127,14 +122,13 @@ impl<F: PrimeField> AggregateWithHashPublicParams<F> {
             num_limbs: num_limb2,
         };
         Self { n, n_square }
-        // Self { n }
     }
 }
 
-/// An assigned AggregateWithHash public key.
+/// Assigned AggregateWithHash public params.
 #[derive(Clone, Debug)]
 pub struct AssignedAggregateWithHashPublicParams<F: PrimeField> {
-    /// a modulus parameter
+    /// modulus parameter
     pub n: AssignedInteger<F, Fresh>,
     pub n_square: AssignedInteger<F, Fresh>,
 }
@@ -144,18 +138,16 @@ impl<F: PrimeField> AssignedAggregateWithHashPublicParams<F> {
     ///
     /// # Arguments
     /// * n - an assigned integer of `n`.
+    /// * n_square - an assigned integer of `n^2`.
     ///
     /// # Return values
     /// Returns new [`AssignedAggregateWithHashPublicParams`].
     pub fn new(n: AssignedInteger<F, Fresh>, n_square: AssignedInteger<F, Fresh>) -> Self {
         Self { n, n_square }
     }
-    // pub fn new(n: AssignedInteger<F, Fresh>) -> Self {
-    //     Self { n }
-    // }
 }
 
-/// AggregateWithHash public key that is about to be assigned.
+/// AggregateWithHash partial keys that is about to be assigned.
 #[derive(Clone, Debug)]
 pub struct AggregateWithHashPartialKeys<F: PrimeField> {
     /// a modulus parameter
@@ -183,7 +175,7 @@ impl<F: PrimeField> AggregateWithHashPartialKeys<F> {
     }
 }
 
-/// An assigned AggregateWithHash public key.
+/// Assigned AggregateWithHash partial keys.
 #[derive(Clone, Debug)]
 pub struct AssignedAggregateWithHashPartialKeys<F: PrimeField> {
     pub partial_keys: Vec<AssignedAggregateWithHashExtractionKey<F>>,

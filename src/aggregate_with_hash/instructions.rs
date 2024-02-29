@@ -1,6 +1,7 @@
 use crate::{
-    AggregateWithHashExtractionKey, AggregateWithHashPublicParams, AssignedAggregateWithHashExtractionKey,
-    AssignedAggregateWithHashPartialKeys, AssignedAggregateWithHashPublicParams,
+    AggregateWithHashExtractionKey, AggregateWithHashPublicParams,
+    AssignedAggregateWithHashExtractionKey, AssignedAggregateWithHashPartialKeys,
+    AssignedAggregateWithHashPublicParams,
 };
 use ff::PrimeField;
 use halo2wrong::halo2::plonk::Error;
@@ -22,7 +23,7 @@ pub trait AggregateWithHashInstructions<F: PrimeField> {
         extraction_key: AggregateWithHashExtractionKey<F>,
     ) -> Result<AssignedAggregateWithHashExtractionKey<F>, Error>;
 
-    /// Given a base `x`, a AggregateWithHash public key (e,n), performs the modular power `x^e mod n`.
+    /// Given partial keys `Vec<(u,v,y,w)>`, a AggregateWithHash extraction key (u,v,y,w), performs the modular multiplication repeatedly.
     fn aggregate_with_hash(
         &self,
         ctx: &mut RegionCtx<'_, F>,

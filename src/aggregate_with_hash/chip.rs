@@ -32,8 +32,6 @@ pub struct AggregateWithHashConfig {
     /// Configuration for [`BigIntChip`].
     pub bigint_config: BigIntConfig,
     pub bigint_square_config: BigIntConfig,
-    // instance: Column<Instance>,
-    // Hash
     pub hash_config: MainGateConfig,
 }
 
@@ -50,7 +48,6 @@ impl AggregateWithHashConfig {
         bigint_square_config: BigIntConfig,
         hash_config: MainGateConfig,
     ) -> Self {
-        // pub fn new(bigint_config: BigIntConfig, hash_config: MainGateConfig) -> Self {
         Self {
             bigint_config,
             bigint_square_config,
@@ -78,7 +75,7 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
     ///
     /// # Arguments
     /// * `ctx` - a region context.
-    /// * `public_key` - a AggregateWithHash public key to assign.
+    /// * `extraction_key` - an extraction key to assign.
     ///
     /// # Return values
     /// Returns a new [`AssignedAggregateWithHashPublicKey`].
@@ -95,14 +92,13 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
         let y = bigint_chip.assign_integer(ctx, extraction_key.y)?;
         let w = bigint_square_chip.assign_integer(ctx, extraction_key.w)?;
         Ok(AssignedAggregateWithHashExtractionKey::new(u, v, y, w))
-        // Ok(AssignedAggregateWithHashExtractionKey::new(u))
     }
 
     /// Assigns a [`AssignedAggregateWithHashPublicParams`].
     ///
     /// # Arguments
     /// * `ctx` - a region context.
-    /// * `public_key` - a AggregateWithHash public key to assign.
+    /// * `public_params` - public parameters to assign.
     ///
     /// # Return values
     /// Returns a new [`AssignedAggregateWithHashPublicParams`].
@@ -116,19 +112,17 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
         let n = bigint_chip.assign_integer(ctx, public_params.n)?;
         let n_square = bigint_square_chip.assign_integer(ctx, public_params.n_square)?;
         Ok(AssignedAggregateWithHashPublicParams::new(n, n_square))
-        // Ok(AssignedAggregateWithHashPublicParams::new(n))
     }
 
-    /// Given a base `x`, a AggregateWithHash public key (e,n), performs the modular power `x^e mod n`.
+    /// Given partial keys `Vec<(u,v,y,w)>`, a AggregateWithHash extraction key (u,v,y,w), performs the modular multiplication repeatedly.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
     /// * `partial_keys` - a vector of input partial keys.
-    /// * `aggregated_key` - an aggregated key for output.
     /// * `public_params` - an assigned AggregateWithHash public params.
     ///
     /// # Return values
-    /// Returns the modular power result `x^e mod n` as [`AssignedInteger<F, Fresh>`].
+    /// Returns an aggregated key for output as [`AssignedAggregateWithHashExtractionKey<F>`].
     fn aggregate_with_hash(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -184,7 +178,6 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
     /// # Arguments
     /// * config - a configuration for [`AggregateWithHashChip`].
     /// * bits_len - the default bit length of [`Fresh`] type integers in this chip.
-    /// * exp_limb_bits - the width of each limb when the exponent is decomposed.
     ///
     /// # Return values
     /// Returns a new [`AggregateWithHashChip`]
@@ -277,7 +270,6 @@ mod test {
     use halo2wrong::halo2::circuit::{AssignedCell, Chip};
     use halo2wrong::halo2::dev::MockProver;
     use halo2wrong::halo2::{
-        // circuit::floor_planner,
         circuit::SimpleFloorPlanner,
         plonk::{Circuit, ConstraintSystem},
     };
@@ -290,9 +282,9 @@ mod test {
         ($circuit_name:ident, $test_fn_name:ident, $bits_len:expr, $should_be_error:expr, $( $synth:tt )*) => {
             struct $circuit_name<F: PrimeField, const T: usize, const RATE: usize> {
                 partial_keys: Vec<ExtractionKey2>,
-                aggregated_key: ExtractionKey2,
+                // aggregated_key: ExtractionKey2,
                 n: BigUint,
-                // Poseidon Enc
+                // Poseidon Hash
                 spec: Spec<F, T, RATE>,
                 n_square: BigUint,
                 _f: PhantomData<F>
@@ -342,14 +334,9 @@ mod test {
                     let hash_config = main_gate_config.clone();
 
 
-                    //TODO add instance to check agg key
-                    // let instance = meta.instance_column();
-                    // meta.enable_equality(instance);
-
                     Self::Config{
                         bigint_config,
                         bigint_square_config,
-                        // instance
                         hash_config,
                     }
                 }
@@ -375,7 +362,6 @@ mod test {
 
                     let mut aggregated_key = ExtractionKey2{
                         u: BigUint::from(1usize), v: BigUint::from(1usize), y: BigUint::from(1usize), w: BigUint::from(1usize),
-                        // u: BigUint::from(1usize),
                     };
 
                     for _ in 0..MAX_SEQUENCER_NUMBER2{
@@ -385,7 +371,6 @@ mod test {
                         let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len*2)) % &n_square;
 
                         partial_keys.push(ExtractionKey2{u: u.clone(), v: v.clone(), y: y.clone(), w: w.clone()});
-                        // partial_keys.push(ExtractionKey2{u: u.clone()});
 
 
                         aggregated_key.u = aggregated_key.u * &u % &n;
@@ -393,7 +378,7 @@ mod test {
                         aggregated_key.y = aggregated_key.y * &y % &n;
                         aggregated_key.w = aggregated_key.w * &w % &n_square;
                     }
-                    ///TODO calculate hash value
+
                     let mut ref_hasher = Poseidon::<F, T, RATE>::new_hash(8, 57);
                     let base1: F = big_to_fe(BigUint::from(
                         2_u128.pow(($circuit_name::<F, T, RATE>::LIMB_WIDTH as u128).try_into().unwrap()),
@@ -465,15 +450,18 @@ mod test {
 
                     let circuit = $circuit_name::<F, T, RATE> {
                         partial_keys,
-                        aggregated_key,
                         n,
                         spec,
-                        // hash
                         n_square,
                         _f: PhantomData
                     };
 
-                    let public_inputs = vec![hashes];
+                    let mut public_inputs = vec![hashes];
+                    public_inputs[0].extend(decompose_big::<F>(aggregated_key.u.clone(), num_limbs, limb_width));
+                    public_inputs[0].extend(decompose_big::<F>(aggregated_key.v.clone(), num_limbs * 2, limb_width));
+                    public_inputs[0].extend(decompose_big::<F>(aggregated_key.y.clone(), num_limbs, limb_width));
+                    public_inputs[0].extend(decompose_big::<F>(aggregated_key.w.clone(), num_limbs * 2, limb_width));
+
 
                     let k = 21;
                     let prover = match MockProver::run(k, &circuit, public_inputs) {
@@ -507,7 +495,6 @@ mod test {
             let limb_width = Self::LIMB_WIDTH;
             let num_limbs = Self::BITS_LEN / Self::LIMB_WIDTH;
             let aggregate_with_hash_chip = self.aggregate_with_hash_chip(config.clone());
-            // let bigint_chip = AggregateWithHashChip::<F,T,RATE>::new_bigint(config.bigint_config, Self::BITS_LEN); //aggregate_with_hash_chip.bigint_chip();
             let bigint_chip = aggregate_with_hash_chip.bigint_chip();
             let main_gate_chip = bigint_chip.main_gate();
             let bigint_square_chip = aggregate_with_hash_chip.bigint_square_chip();
@@ -563,9 +550,7 @@ mod test {
                     Ok((u_out, v_out, y_out, w_out))
                 },
             )?;
-            println!("u_out = {:?}", u_out[0]);
 
-            // let h_spec = Spec::<F, T, RATE>::new(8, 57);
             let hash_out = layouter.assign_region(
                 || "hash mapping from 2048bit",
                 |region| {
@@ -611,15 +596,11 @@ mod test {
 
                         let v = v_out[i].clone();
                         for j in 0..v.num_limbs() / 3 {
-                            // println!("limb({:?}) = {:?}", 3 * i, rsa_input.limb(3 * i));
-                            // println!("limb({:?}) = {:?}", 3 * i + 1, rsa_input.limb(3 * i + 1));
-                            // println!("limb({:?}) = {:?}", 3 * i + 2, rsa_input.limb(3 * i + 2));
                             let mut a_poly = v.limb(3 * j);
                             a_poly =
                                 main_gate_chip.mul_add(ctx, &v.limb(3 * j + 1), &base1, &a_poly)?;
                             a_poly =
                                 main_gate_chip.mul_add(ctx, &v.limb(3 * j + 2), &base2, &a_poly)?;
-                            // println!("a_ploy value:{:?}", a_poly);
                             let e = a_poly;
                             hasher.update(&[e.clone()]);
                         }
@@ -627,21 +608,16 @@ mod test {
                         let mut a_poly = v.limb(30);
 
                         a_poly = main_gate_chip.mul_add(ctx, &v.limb(31), &base1, &a_poly)?;
-                        // println!("a_ploy value:{:?}", a_poly);
                         let e = a_poly;
                         hasher.update(&[e.clone()]);
 
                         let y = y_out[i].clone();
                         for j in 0..y.num_limbs() / 3 {
-                            // println!("limb({:?}) = {:?}", 3 * i, rsa_input.limb(3 * i));
-                            // println!("limb({:?}) = {:?}", 3 * i + 1, rsa_input.limb(3 * i + 1));
-                            // println!("limb({:?}) = {:?}", 3 * i + 2, rsa_input.limb(3 * i + 2));
                             let mut a_poly = y.limb(3 * j);
                             a_poly =
                                 main_gate_chip.mul_add(ctx, &y.limb(3 * j + 1), &base1, &a_poly)?;
                             a_poly =
                                 main_gate_chip.mul_add(ctx, &y.limb(3 * j + 2), &base2, &a_poly)?;
-                            // println!("a_ploy value:{:?}", a_poly);
                             let e = a_poly;
                             hasher.update(&[e.clone()]);
                         }
@@ -649,21 +625,16 @@ mod test {
                         let mut a_poly = y.limb(30);
 
                         a_poly = main_gate_chip.mul_add(ctx, &y.limb(31), &base1, &a_poly)?;
-                        // println!("a_ploy value:{:?}", a_poly);
                         let e = a_poly;
                         hasher.update(&[e.clone()]);
 
                         let w = w_out[i].clone();
                         for j in 0..w.num_limbs() / 3 {
-                            // println!("limb({:?}) = {:?}", 3 * i, rsa_input.limb(3 * i));
-                            // println!("limb({:?}) = {:?}", 3 * i + 1, rsa_input.limb(3 * i + 1));
-                            // println!("limb({:?}) = {:?}", 3 * i + 2, rsa_input.limb(3 * i + 2));
                             let mut a_poly = w.limb(3 * j);
                             a_poly =
                                 main_gate_chip.mul_add(ctx, &w.limb(3 * j + 1), &base1, &a_poly)?;
                             a_poly =
                                 main_gate_chip.mul_add(ctx, &w.limb(3 * j + 2), &base2, &a_poly)?;
-                            // println!("a_ploy value:{:?}", a_poly);
                             let e = a_poly;
                             hasher.update(&[e.clone()]);
                         }
@@ -671,34 +642,25 @@ mod test {
                         let mut a_poly = w.limb(30);
 
                         a_poly = main_gate_chip.mul_add(ctx, &w.limb(31), &base1, &a_poly)?;
-                        // println!("a_ploy value:{:?}", a_poly);
                         let e = a_poly;
                         hasher.update(&[e.clone()]);
 
-                        // let mut h_out: Vec<AssignedCell<F, F>> = vec![];
                         let h_assiged = hasher.hash(ctx)?;
                         hash_out.push(h_assiged[1].clone());
                         hash_out.push(h_assiged[2].clone());
-
-                        // println!("hash_out[{}] = {:?}", i, h_assiged[1]);
-                        // println!("hash_out[{}] = {:?}", i, h_assiged[2]);
-
-                        // hash_out.push(h_out);
                     }
                     Ok(hash_out)
                 },
             )?;
 
-            //TODO check with instance
             let mut index = 0;
             for hash in hash_out.iter() {
-                println!("index: {:?}, hash_out: {:?}", index, hash);
                 layouter.constrain_instance(hash.cell(), instances, index)?;
                 index += 1;
             }
 
-            layouter.assign_region(
-                || "aggregate_with_hash test with 2048 bits RSA parameter",
+            let valid_aggregated_key = layouter.assign_region(
+                || "aggregate test with 2048 bits RSA parameter",
                 |region| {
                     let offset = 0;
                     let ctx = &mut RegionCtx::new(region, offset);
@@ -712,64 +674,16 @@ mod test {
 
                     let mut partial_keys_assigned = vec![];
                     for i in 0..MAX_SEQUENCER_NUMBER2 {
-                        // let extraction_key_unassgined = AggregateWithHashExtractionKey::new(
-                        //     u_unassigned,
-                        //     v_unassigned,
-                        //     y_unassigned,
-                        //     w_unassigned,
-                        // );
-
-                        // let assigned_extraction_key =
-                        //     AssignedAggregateWithHashExtractionKey::new(u_out[i].clone());
-                        // let assigned_extraction_key = aggregate_with_hash_chip
-                        //     .assign_extraction_key(ctx, extraction_key_unassgined)?;
-
                         let assigned_extraction_key = AssignedAggregateWithHashExtractionKey::new(
                             u_out[i].clone(),
                             v_out[i].clone(),
                             y_out[i].clone(),
                             w_out[i].clone(),
                         );
-                        partial_keys_assigned.push(
-                            assigned_extraction_key,
-                            // aggregate_with_hash_chip.assign_extraction_key(ctx, extraction_key_unassgined)?,
-                        );
+                        partial_keys_assigned.push(assigned_extraction_key);
                     }
                     let partial_keys =
                         AssignedAggregateWithHashPartialKeys::new(partial_keys_assigned);
-
-                    let agg_u_limbs =
-                        decompose_big::<F>(self.aggregated_key.u.clone(), num_limbs, limb_width);
-                    let agg_v_limb = decompose_big::<F>(
-                        self.aggregated_key.v.clone(),
-                        num_limbs * 2,
-                        limb_width,
-                    );
-                    let agg_y_limbs =
-                        decompose_big::<F>(self.aggregated_key.y.clone(), num_limbs, limb_width);
-                    let agg_w_limb = decompose_big::<F>(
-                        self.aggregated_key.w.clone(),
-                        num_limbs * 2,
-                        limb_width,
-                    );
-                    let agg_u_unassigned = UnassignedInteger::from(agg_u_limbs);
-                    let agg_v_unassigned = UnassignedInteger::from(agg_v_limb);
-                    let agg_y_unassigned = UnassignedInteger::from(agg_y_limbs);
-                    let agg_w_unassigned = UnassignedInteger::from(agg_w_limb);
-                    let agg_key_unassigned = AggregateWithHashExtractionKey::new(
-                        agg_u_unassigned,
-                        agg_v_unassigned,
-                        agg_y_unassigned,
-                        agg_w_unassigned,
-                    );
-                    let agg_key_assigned =
-                        aggregate_with_hash_chip.assign_extraction_key(ctx, agg_key_unassigned)?;
-                    // let agg_key = AssignedAggregateWithHashExtractionKey::new(
-                    //     agg_key_assigned.u.clone(),
-                    //     agg_key_assigned.v.clone(),
-                    //     agg_key_assigned.y.clone(),
-                    //     agg_key_assigned.w.clone(),
-                    // );
 
                     let public_params_unassigned = AggregateWithHashPublicParams::new(
                         n_unassigned.clone(),
@@ -777,46 +691,58 @@ mod test {
                     );
                     let public_params = aggregate_with_hash_chip
                         .assign_public_params(ctx, public_params_unassigned)?;
-                    let valid_agg_key = aggregate_with_hash_chip.aggregate_with_hash(
+                    let valid_aggregated_key = aggregate_with_hash_chip.aggregate_with_hash(
                         ctx,
                         &partial_keys.clone(),
                         &public_params.clone(),
                     )?;
 
-                    // TODO add instance to check agg key
-                    // let u_cells = aggregated_extraction_key
-                    //     .u
-                    //     .limbs()
-                    //     .into_iter()
-                    //     .map(|v| v.assigned_val().cell())
-                    //     .collect::<Vec<Cell>>();
-                    // Ok(u_cells)
-
-                    bigint_chip.assert_equal_fresh(ctx, &valid_agg_key.u, &agg_key_assigned.u)?;
-                    bigint_square_chip.assert_equal_fresh(
-                        ctx,
-                        &valid_agg_key.v,
-                        &agg_key_assigned.v,
-                    )?;
-                    bigint_chip.assert_equal_fresh(ctx, &valid_agg_key.y, &agg_key_assigned.y)?;
-                    bigint_square_chip.assert_equal_fresh(
-                        ctx,
-                        &valid_agg_key.w,
-                        &agg_key_assigned.w,
-                    )?;
-
-                    Ok(())
+                    Ok(valid_aggregated_key)
                 },
             )?;
+
+            (0..num_limbs).try_for_each(|i| -> Result<(), Error> {
+                layouter.constrain_instance(
+                    valid_aggregated_key.u.limb(i).cell(),
+                    instances,
+                    index,
+                )?;
+                index += 1;
+                Ok(())
+            })?;
+            (0..num_limbs * 2).try_for_each(|i| -> Result<(), Error> {
+                layouter.constrain_instance(
+                    valid_aggregated_key.v.limb(i).cell(),
+                    instances,
+                    index,
+                )?;
+                index += 1;
+                Ok(())
+            })?;
+            (0..num_limbs).try_for_each(|i| -> Result<(), Error> {
+                layouter.constrain_instance(
+                    valid_aggregated_key.y.limb(i).cell(),
+                    instances,
+                    index,
+                )?;
+                index += 1;
+                Ok(())
+            })?;
+            (0..num_limbs * 2).try_for_each(|i| -> Result<(), Error> {
+                layouter.constrain_instance(
+                    valid_aggregated_key.w.limb(i).cell(),
+                    instances,
+                    index,
+                )?;
+                index += 1;
+                Ok(())
+            })?;
+
             let range_chip = bigint_chip.range_chip();
             let range_square_chip = bigint_square_chip.range_chip();
             range_chip.load_table(&mut layouter)?;
             range_square_chip.load_table(&mut layouter)?;
 
-            // TODO add instance to check agg key
-            // for (i, cell) in agg_extraction_key.into_iter().enumerate() {
-            //     layouter.constrain_instance(cell, config.instance, i);
-            // }
             Ok(())
         }
     );
