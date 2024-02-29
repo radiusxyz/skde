@@ -232,8 +232,8 @@ pub struct AggregateWithHashCircuit<F: PrimeField, const T: usize, const RATE: u
 impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
     AggregateWithHashCircuit<F, T, RATE>
 {
-    const BITS_LEN: usize = 2048; // n's bit length
-    const LIMB_WIDTH: usize = AggregateWithHashChip::<F, T, RATE>::LIMB_WIDTH;
+    pub const BITS_LEN: usize = 2048; // n's bit length
+    pub const LIMB_WIDTH: usize = AggregateWithHashChip::<F, T, RATE>::LIMB_WIDTH;
     fn aggregate_with_hash_chip(
         &self,
         config: AggregateWithHashConfig,
