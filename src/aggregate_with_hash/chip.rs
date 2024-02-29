@@ -282,7 +282,6 @@ mod test {
         ($circuit_name:ident, $test_fn_name:ident, $bits_len:expr, $should_be_error:expr, $( $synth:tt )*) => {
             struct $circuit_name<F: PrimeField, const T: usize, const RATE: usize> {
                 partial_keys: Vec<ExtractionKey2>,
-                // aggregated_key: ExtractionKey2,
                 n: BigUint,
                 // Poseidon Hash
                 spec: Spec<F, T, RATE>,
