@@ -3,6 +3,8 @@ pub use big_integer::*;
 use ff::FromUniformBytes;
 use maingate::big_to_fe;
 use maingate::MainGateInstructions;
+pub mod delay_encryption;
+pub use delay_encryption::*;
 pub mod aggregate;
 pub use crate::aggregate::*;
 pub mod aggregate_with_hash;
@@ -165,7 +167,7 @@ impl<F: PrimeField> Circuit<F> for AggregateCircuit<F> {
                 let mut partial_keys_assigned = vec![];
                 for i in 0..MAX_SEQUENCER_NUMBER {
                     let decomposed_partial_key =
-                        aggregate::chip::ExtractionKey::decompose_extraction_key(
+                        crate::delay_encryption::ExtractionKey::decompose_extraction_key(
                             &self.partial_keys[i],
                         );
 
@@ -566,12 +568,10 @@ fn test_aggregate_circuit() {
     }
 
     let combined_partial_limbs: Vec<Fr> =
-        aggregate::chip::ExtractionKey::decompose_and_combine_all_partial_keys(
-            partial_keys.clone(),
-        );
+        crate::ExtractionKey::decompose_and_combine_all_partial_keys(partial_keys.clone());
 
     let decomposed_extraction_key: DecomposedExtractionKey<Fr> =
-        aggregate::chip::ExtractionKey::decompose_extraction_key(&aggregated_key);
+        crate::ExtractionKey::decompose_extraction_key(&aggregated_key);
     let mut combined_limbs = decomposed_extraction_key.combine_limbs();
 
     let circuit = AggregateCircuit::<Fr> {
