@@ -113,17 +113,17 @@ fn generate_uv_pair(
     let n_plus_one = n + one_big;
 
     // U = g^r mod n
-    let u = big_pow_mod(&g, &a, &n);
+    let u = big_pow_mod(g, a, n);
     // h_exp_r = h^r mod n, h_exp_rn = h^(r * n) mod n^2
-    let h_exp_a = big_pow_mod(&h, &a, &n);
-    let h_exp_an = big_pow_mod(&h_exp_a, &n, &n_square);
+    let h_exp_a = big_pow_mod(h, a, n);
+    let h_exp_an = big_pow_mod(&h_exp_a, n, &n_square);
     // V = (n+1)^s * hrn mod n^2
-    let v = (&big_pow_mod(&n_plus_one, &b, &n_square) * &h_exp_an) % &n_square;
+    let v = (&big_pow_mod(&n_plus_one, b, &n_square) * &h_exp_an) % &n_square;
 
     UVPair {
-        u: u,
-        v: v, // u: pad_or_trim(u, (2 * lambda / 8) as usize),
-              // v: pad_or_trim(v, (2 * lambda / 4) as usize),
+        u,
+        v, // u: pad_or_trim(u, (2 * lambda / 8) as usize),
+           // v: pad_or_trim(v, (2 * lambda / 4) as usize),
     }
 }
 
@@ -141,7 +141,7 @@ fn big_mod_inv(a: &BigUint, m: &BigUint) -> Option<BigUint> {
     }
 
     while a0 > one.clone().into() {
-        let q: BigInt = (a0.clone() / m0.clone()).into();
+        let q: BigInt = a0.clone() / m0.clone();
 
         let mut temp: BigInt = m0.clone();
 
@@ -157,7 +157,7 @@ fn big_mod_inv(a: &BigUint, m: &BigUint) -> Option<BigUint> {
 
     // Make inv positive
     if inv < zero.into() {
-        inv = inv + m_int;
+        inv += m_int;
     }
     inv.to_biguint()
 }
@@ -170,14 +170,14 @@ fn prove_key_validity(
 ) -> KeyProof {
     let m = MAX_SEQUENCER_NUMBER;
     let two_big = BigUint::from(2u32);
-    let t = BigUint::from(skde_params.t.clone());
+    let t = BigUint::from(skde_params.t);
     let n_half = &skde_params.n / &two_big;
     let n_half_plus_n_over_m = &n_half + (&skde_params.n / m);
 
     let x = generate_random_biguint(n_half_plus_n_over_m.bits());
     let l = generate_random_biguint(n_half.bits());
 
-    let ab_pair = generate_uv_pair(&x, &l, &skde_params);
+    let ab_pair = generate_uv_pair(&x, &l, skde_params);
     let a = ab_pair.u;
     let b = ab_pair.v;
     let tau = big_pow_mod(&skde_params.g, &l, &skde_params.n);
@@ -266,7 +266,7 @@ fn verify_key_validity(
     extraction_key: ExtractionKey,
     key_proof: KeyProof,
 ) -> bool {
-    let t = BigUint::from(skde_params.t.clone());
+    let t = BigUint::from(skde_params.t);
     let n_square: BigUint = &skde_params.n * &skde_params.n;
 
     let one_big = BigUint::from(1u32);
@@ -431,6 +431,8 @@ pub fn decrypt(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
 
     #[test]
@@ -453,24 +455,29 @@ mod tests {
             key_pairs.push(extraction_key);
         }
         // Aggregate all generated keys
+        let aggregation_start = Instant::now();
         let aggregated_key = aggregate_key_pairs(&key_pairs, &skde_params);
-        println!("aggregated key: {:?}", aggregated_key);
+        let aggregation_duration = aggregation_start.elapsed();
+        println!("Aggregation time: {:?}", aggregation_duration);
 
         let public_key = PublicKey {
             pk: aggregated_key.u.clone(),
         };
 
+        let puzzle_start = Instant::now();
         let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
+        let puzzle_duration = puzzle_start.elapsed();
+        println!("Puzzle solved time: {:?}", puzzle_duration);
 
-        println!("Puzzle solved!: {:?}", secret_key);
-
+        let encryption_start = Instant::now();
         let cipher_text = encrypt(&skde_params, message, &public_key).unwrap();
+        let encryption_duration = encryption_start.elapsed();
+        println!("Encryption time: {:?}", encryption_duration);
 
-        println!("Encryption Result: {:?}", cipher_text);
-
+        let decryption_start = Instant::now();
         let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key).unwrap();
-
-        println!("decrypted_message: {:?}", decrypted_message);
+        let decryption_duration = decryption_start.elapsed();
+        println!("Decryption time: {:?}", decryption_duration);
 
         assert_eq!(
             message, decrypted_message,
