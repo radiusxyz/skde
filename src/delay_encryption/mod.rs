@@ -8,18 +8,13 @@ use num_bigint::{BigInt, BigUint, RandBigInt};
 use rand::thread_rng;
 use sha2::{Digest, Sha512};
 
-pub const MAX_SEQUENCER_NUMBER: usize = 20;
+pub const MAX_SEQUENCER_NUMBER: usize = 2;
 
 // p * q = 109108784166676529682340577929498188950239585527883687884827626040722072371127456712391033422811328348170518576414206624244823392702116014678887602655605057984874271545556188865755301275371611259397284800785551682318694176857633188036311000733221068448165870969366710007572931433736793827320953175136545355129
 pub const PRIME_P: &str = "8155133734070055735139271277173718200941522166153710213522626777763679009805792017274916613411023848268056376687809186180768200590914945958831360737612803";
 pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
 pub const GENERATOR: &str = "4";
 pub const TIME_PARAM_T: u32 = 4;
-
-// #[derive(Debug, Clone)]
-// pub struct PublicKey {
-//     pub u: BigUint,
-// }
 
 #[derive(Debug, Clone)]
 pub struct ExtractionKey {
@@ -41,8 +36,8 @@ pub struct SecretKey {
 
 #[derive(Debug, Clone)]
 pub struct CipherPair {
-    pub c1: BigUint,
-    pub c2: BigUint,
+    pub c1: String,
+    pub c2: String,
 }
 
 #[derive(Debug, Clone)]
@@ -100,26 +95,6 @@ fn generate_random_biguint(bits_size: u64) -> BigUint {
     let mut rng = thread_rng();
     rng.gen_biguint(bits_size)
 }
-
-// fn pad_or_trim(value: BigUint, size: usize) -> BigUint {
-//     // BigUint을 바이트 배열로 변환
-//     let mut bytes = value.to_bytes_be();
-
-//     let current_length = bytes.len();
-//     if current_length == size {
-//         // 길이가 정확히 일치하면 변환 없이 바로 반환
-//         value
-//     } else if current_length < size {
-//         // 길이가 더 짧은 경우, 앞쪽을 0으로 패딩
-//         let mut padded_bytes = vec![0u8; size - current_length];
-//         padded_bytes.extend_from_slice(&bytes);
-//         BigUint::from_bytes_be(&padded_bytes)
-//     } else {
-//         // 길이가 더 긴 경우, 앞쪽을 자름
-//         let trimmed_bytes = &bytes[current_length - size..];
-//         BigUint::from_bytes_be(trimmed_bytes)
-//     }
-// }
 
 // Input: (a, b, skde_params = (n, g, t, h))
 // Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
@@ -380,8 +355,8 @@ pub fn aggregate_key_pairs(
 
 pub fn encrypt(
     skde_params: &SingleKeyDelayEncryptionParam,
-    message: BigUint,
-    key: PublicKey,
+    message: &str,
+    key: &PublicKey,
 ) -> io::Result<CipherPair> {
     // TODO: Arbitrary Length of Message
     let plain_text = BigUint::from_str(message).expect("Invalid message");
@@ -399,17 +374,17 @@ pub fn encrypt(
     let l: BigUint = rng.gen_biguint(skde_params.n.bits() / 2);
     let pk_pow_l = big_pow_mod(&key.pk, &l, &skde_params.n);
     let cipher1 = big_pow_mod(&skde_params.g, &l, &skde_params.n);
-    let cipher2 = big_mul_mod(&message, &pk_pow_l, &skde_params.n);
+    let cipher2 = big_mul_mod(&plain_text, &pk_pow_l, &skde_params.n);
 
     Ok(CipherPair {
-        c1: cipher1,
-        c2: cipher2,
+        c1: cipher1.to_str_radix(10),
+        c2: cipher2.to_str_radix(10),
     })
 }
 
 pub fn solve_time_lock_puzzle(
     skde_params: &SingleKeyDelayEncryptionParam,
-    aggregated_key: ExtractionKey,
+    aggregated_key: &ExtractionKey,
 ) -> io::Result<SecretKey> {
     let n_square: BigUint = &skde_params.n * &skde_params.n;
 
@@ -439,10 +414,11 @@ pub fn solve_time_lock_puzzle(
 
 pub fn decrypt(
     skde_params: &SingleKeyDelayEncryptionParam,
-    cipher_text: CipherPair,
-    secret_key: SecretKey,
-) -> io::Result<BigUint> {
-    let result = cipher_text.c2;
+    cipher_text: &CipherPair,
+    secret_key: &SecretKey,
+) -> io::Result<String> {
+    let cipher1 = BigUint::from_str(&cipher_text.c1).unwrap();
+    let cipher2 = BigUint::from_str(&cipher_text.c2).unwrap();
 
     let exponentiation = big_pow_mod(&cipher1, &secret_key.sk, &skde_params.n);
 
@@ -468,9 +444,8 @@ mod tests {
         let mut key_pairs: Vec<ExtractionKey> = Vec::new();
         let message: &str = "12345";
 
-        for _ in 0..d {
+        for _ in 0..MAX_SEQUENCER_NUMBER {
             let (extraction_key, key_proof) = key_generation_with_proof(skde_params.clone());
-
             assert!(
                 verify_key_validity(&skde_params, extraction_key.clone(), key_proof),
                 "Key verification failed"
