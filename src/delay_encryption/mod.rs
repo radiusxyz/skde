@@ -4,8 +4,10 @@ use std::{
     str::FromStr,
 };
 
-use num_bigint::{BigInt, BigUint, RandBigInt};
+use num_bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
+use num_traits::{One, Zero};
 use rand::thread_rng;
+use rayon::prelude::*;
 use sha2::{Digest, Sha512};
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
@@ -14,7 +16,7 @@ pub const MAX_SEQUENCER_NUMBER: usize = 2;
 pub const PRIME_P: &str = "8155133734070055735139271277173718200941522166153710213522626777763679009805792017274916613411023848268056376687809186180768200590914945958831360737612803";
 pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
 pub const GENERATOR: &str = "4";
-pub const TIME_PARAM_T: u32 = 4;
+pub const TIME_PARAM_T: u32 = 23; // delay time depends on: 2^TIME_PARMA_T
 
 #[derive(Debug, Clone)]
 pub struct ExtractionKey {
@@ -64,7 +66,7 @@ pub struct KeyProof {
 }
 
 // compute h = g^{2^t} mod n
-fn repeat_square_mod(g: &BigUint, t: u32, n: &BigUint) -> BigUint {
+fn pow_mod(g: &BigUint, t: u32, n: &BigUint) -> BigUint {
     let mut h = g.clone();
     (0..t).for_each(|_| {
         h = (&h * &h) % n;
@@ -83,12 +85,11 @@ fn big_mul_mod(a: &BigUint, b: &BigUint, modulus: &BigUint) -> BigUint {
 }
 
 fn is_divided(dividend: &BigUint, divisor: &BigUint) -> bool {
-    let zero_big = BigUint::from(0u32);
-    if divisor == &zero_big {
+    if divisor == &BigUint::zero() {
         return false;
     }
 
-    dividend % divisor == zero_big
+    dividend % divisor == BigUint::zero()
 }
 
 fn generate_random_biguint(bits_size: u64) -> BigUint {
@@ -107,10 +108,9 @@ fn generate_uv_pair(
     let g = &skde_params.g;
     let h = &skde_params.h;
 
-    let lambda = n.bits() / 2 + 1;
-    let one_big = BigUint::from(1u32);
+    // let lambda = n.bits() / 2 + 1;
     let n_square = n * n;
-    let n_plus_one = n + one_big;
+    let n_plus_one = n + BigUint::one();
 
     // U = g^r mod n
     let u = big_pow_mod(g, a, n);
@@ -120,45 +120,35 @@ fn generate_uv_pair(
     // V = (n+1)^s * hrn mod n^2
     let v = (&big_pow_mod(&n_plus_one, b, &n_square) * &h_exp_an) % &n_square;
 
-    UVPair {
-        u,
-        v, // u: pad_or_trim(u, (2 * lambda / 8) as usize),
-           // v: pad_or_trim(v, (2 * lambda / 4) as usize),
-    }
+    UVPair { u, v }
 }
 
 fn big_mod_inv(a: &BigUint, m: &BigUint) -> Option<BigUint> {
-    let mut m0: BigInt = m.clone().into();
-    let mut a0: BigInt = a.clone().into();
-    let m_int: BigInt = m.clone().into();
-    let zero = BigUint::from(0u32);
-    let one = BigUint::from(1u32);
-    let mut x0: BigInt = zero.clone().into();
-    let mut inv: BigInt = one.clone().into();
-
+    let one = BigUint::one();
     if m == &one {
-        return Some(zero);
+        return Some(BigUint::zero());
     }
 
-    while a0 > one.clone().into() {
-        let q: BigInt = a0.clone() / m0.clone();
+    let mut m0 = m.to_bigint().unwrap();
+    let mut a0 = a.to_bigint().unwrap();
+    let m_int = m0.clone();
+    let mut x0 = BigInt::zero();
+    let mut inv = BigInt::one();
 
-        let mut temp: BigInt = m0.clone();
-
-        m0 = a0.clone() % m0.clone();
+    while a0 > BigInt::one() {
+        let q = &a0 / &m0;
+        let temp = m0.clone();
+        m0 = &a0 % &m0;
         a0 = temp;
-
-        temp = x0.clone();
-
-        // Update x0 and inv
-        x0 = inv.clone() - q.clone() * x0;
-        inv = temp;
+        let temp_x0 = x0.clone();
+        x0 = inv - &q * x0;
+        inv = temp_x0;
     }
 
-    // Make inv positive
-    if inv < zero.into() {
+    if inv < BigInt::zero() {
         inv += m_int;
     }
+
     inv.to_biguint()
 }
 
@@ -224,7 +214,7 @@ pub fn setup(t: u32) -> SingleKeyDelayEncryptionParam {
     let n = p * q;
     // println!("n = {:?}", n);
 
-    let h = repeat_square_mod(&g, t, &n);
+    let h = pow_mod(&g, t, &n);
 
     SingleKeyDelayEncryptionParam { n, g, t, h }
 }
@@ -259,72 +249,6 @@ pub fn key_generation_with_proof(
         },
         key_proof,
     )
-}
-
-fn verify_key_validity(
-    skde_params: &SingleKeyDelayEncryptionParam,
-    extraction_key: ExtractionKey,
-    key_proof: KeyProof,
-) -> bool {
-    let t = BigUint::from(skde_params.t);
-    let n_square: BigUint = &skde_params.n * &skde_params.n;
-
-    let one_big = BigUint::from(1u32);
-
-    let a: BigUint = key_proof.a;
-    let b: BigUint = key_proof.b;
-    let tau: BigUint = key_proof.tau;
-    let alpha: BigUint = key_proof.alpha;
-    let beta: BigUint = key_proof.beta;
-
-    let u = &extraction_key.u;
-    let v = &extraction_key.v;
-    let y = &extraction_key.y;
-    let w = &extraction_key.w;
-
-    // TODO: Range proof verification using SNARK
-
-    // Calculate SHA-512 hash
-    let transcript = vec![
-        &skde_params.n,
-        &skde_params.g,
-        &t,
-        &skde_params.h,
-        &a,
-        &b,
-        &tau,
-    ];
-
-    let e = calculate_challenge(&transcript);
-
-    let h_exp_nalpha = big_pow_mod(&skde_params.h, &(&alpha * &skde_params.n), &n_square);
-    let n_plus_one_exp_beta = big_pow_mod(&(&skde_params.n + &one_big), &beta, &n_square);
-
-    let lhs = vec![
-        big_pow_mod(&skde_params.g, &alpha, &skde_params.n),
-        big_mul_mod(&h_exp_nalpha, &n_plus_one_exp_beta, &n_square),
-        big_pow_mod(&skde_params.g, &beta, &skde_params.n),
-    ];
-
-    let uy = big_mul_mod(u, y, &skde_params.n);
-    let vw = big_mul_mod(v, w, &n_square);
-
-    let rhs = vec![
-        big_mul_mod(&big_pow_mod(&uy, &e, &skde_params.n), &a, &skde_params.n),
-        big_mul_mod(&big_pow_mod(&vw, &e, &n_square), &b, &n_square),
-        big_mul_mod(&big_pow_mod(u, &e, &skde_params.n), &tau, &skde_params.n),
-    ];
-
-    // println!("lhs: {:?}", lhs);
-    // println!("rhs: {:?}", rhs);
-    let verified = lhs.iter().zip(rhs.iter()).all(|(l, r)| l == r);
-
-    // println!(
-    //     "Are all corresponding elements in lhs and rhs equal? {}",
-    //     verified
-    // );
-
-    verified
 }
 
 pub fn aggregate_key_pairs(
@@ -429,34 +353,120 @@ pub fn decrypt(
     Ok(result.to_str_radix(10))
 }
 
+pub fn verify_key_validity(
+    skde_params: &SingleKeyDelayEncryptionParam,
+    extraction_key: ExtractionKey,
+    key_proof: KeyProof,
+) -> bool {
+    let t = BigUint::from(skde_params.t);
+    let n_square: BigUint = &skde_params.n * &skde_params.n;
+    let one_big = BigUint::from(1u32);
+
+    let a = key_proof.a;
+    let b = key_proof.b;
+    let tau = key_proof.tau;
+    let alpha = key_proof.alpha;
+    let beta = key_proof.beta;
+
+    let u = &extraction_key.u;
+    let v = &extraction_key.v;
+    let y = &extraction_key.y;
+    let w = &extraction_key.w;
+
+    // Calculate SHA-512 hash for the challenge
+    let transcript = vec![
+        &skde_params.n,
+        &skde_params.g,
+        &t,
+        &skde_params.h,
+        &a,
+        &b,
+        &tau,
+    ];
+    let e = calculate_challenge(&transcript);
+
+    let h_exp_nalpha = big_pow_mod(&skde_params.h, &(&alpha * &skde_params.n), &n_square);
+    let n_plus_one_exp_beta = big_pow_mod(&(&skde_params.n + &one_big), &beta, &n_square);
+
+    let uy = big_mul_mod(u, y, &skde_params.n);
+    let vw = big_mul_mod(v, w, &n_square);
+
+    // Parallel computation of lhs and rhs vectors
+    let (lhs, rhs): (Vec<BigUint>, Vec<BigUint>) = rayon::join(
+        || {
+            vec![
+                big_pow_mod(&skde_params.g, &alpha, &skde_params.n),
+                big_mul_mod(&h_exp_nalpha, &n_plus_one_exp_beta, &n_square),
+                big_pow_mod(&skde_params.g, &beta, &skde_params.n),
+            ]
+        },
+        || {
+            vec![
+                big_mul_mod(&big_pow_mod(&uy, &e, &skde_params.n), &a, &skde_params.n),
+                big_mul_mod(&big_pow_mod(&vw, &e, &n_square), &b, &n_square),
+                big_mul_mod(&big_pow_mod(u, &e, &skde_params.n), &tau, &skde_params.n),
+            ]
+        },
+    );
+
+    // Parallel verification of lhs and rhs vectors
+    lhs.par_iter().zip(rhs.par_iter()).all(|(l, r)| l == r)
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
 
     use super::*;
 
-    #[test]
-    pub fn setup_test() {
-        setup(200);
-    }
+    use std::time::Instant;
 
     #[test]
-    fn test_signle_key_delay_encryption() {
-        let skde_params = setup(TIME_PARAM_T);
-        let mut key_pairs: Vec<ExtractionKey> = Vec::new();
+    fn test_single_key_delay_encryption() {
+        let time = 2_u32.pow(TIME_PARAM_T);
+        let skde_params = setup(time);
         let message: &str = "12345";
 
-        for _ in 0..MAX_SEQUENCER_NUMBER {
-            let (extraction_key, key_proof) = key_generation_with_proof(skde_params.clone());
-            assert!(
-                verify_key_validity(&skde_params, extraction_key.clone(), key_proof),
-                "Key verification failed"
-            );
-            key_pairs.push(extraction_key);
-        }
+        let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
+            .enumerate()
+            .map(|(index, _)| {
+                let start = Instant::now();
+                let result = key_generation_with_proof(skde_params.clone());
+                let generation_duration = start.elapsed();
+                println!(
+                    "Sequencer{}'s key and proof generation time: {:?}",
+                    index + 1,
+                    generation_duration
+                );
+                result
+            })
+            .collect();
+
+        // verify_key_validity time measure
+        let verification_start = Instant::now();
+        generated_keys_and_proofs
+            .iter()
+            .for_each(|(extraction_key, key_proof)| {
+                assert!(
+                    verify_key_validity(&skde_params, extraction_key.clone(), key_proof.clone()),
+                    "Key verification failed"
+                );
+            });
+        let verification_duration = verification_start.elapsed();
+
+        println!(
+            "Total key verification time for {} keys: {:?}",
+            MAX_SEQUENCER_NUMBER, verification_duration
+        );
+
+        let extraction_keys: Vec<_> = generated_keys_and_proofs
+            .into_iter()
+            .map(|(extraction_key, _)| extraction_key)
+            .collect();
+
         // Aggregate all generated keys
         let aggregation_start = Instant::now();
-        let aggregated_key = aggregate_key_pairs(&key_pairs, &skde_params);
+        let aggregated_key = aggregate_key_pairs(&extraction_keys, &skde_params);
         let aggregation_duration = aggregation_start.elapsed();
         println!("Aggregation time: {:?}", aggregation_duration);
 
@@ -464,15 +474,15 @@ mod tests {
             pk: aggregated_key.u.clone(),
         };
 
-        let puzzle_start = Instant::now();
-        let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
-        let puzzle_duration = puzzle_start.elapsed();
-        println!("Puzzle solved time: {:?}", puzzle_duration);
-
         let encryption_start = Instant::now();
         let cipher_text = encrypt(&skde_params, message, &public_key).unwrap();
         let encryption_duration = encryption_start.elapsed();
         println!("Encryption time: {:?}", encryption_duration);
+
+        let puzzle_start = Instant::now();
+        let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
+        let puzzle_duration = puzzle_start.elapsed();
+        println!("Puzzle solved time: {:?}", puzzle_duration);
 
         let decryption_start = Instant::now();
         let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key).unwrap();
