@@ -33,6 +33,7 @@ use std::{
 };
 // bench-mark tool
 use criterion::Criterion;
+pub const DEGREE: u32 = 21;
 
 // Create the file and directory if it does not exist
 fn ensure_directory_exists(path: &Path) {
@@ -314,7 +315,7 @@ fn main() {
         .nresamples(10); // # of iteration
 
     let benches: Vec<Box<dyn Fn(&mut Criterion)>> = vec![Box::new(|c| {
-        bench_aggregate_with_hash::<21>("skde aggregate", c)
+        bench_aggregate_with_hash::<DEGREE>("skde aggregate", c)
     })];
 
     for bench in benches {

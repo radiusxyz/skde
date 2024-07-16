@@ -1,38 +1,49 @@
 ## Getting Started
 
-### Rust Setup
+### Requirements
 
-First, Install rust using the [rustup](https://rustup.rs/) toolchain installer,
-then run:
+This project requires a specific Rust toolchain version to ensure compatibility and optimal performance. Please ensure that your environment is set up with the following toolchain configuration:
+
+- **Toolchain Channel**: Use the `nightly` channel of the Rust toolchain.
+- **Date**: The toolchain should be specifically from `nightly-2023-10-23`.
+
+You can set up the required toolchain using the following command with `rustup`:
 
 ```bash
-rustup show
+rustup override set nightly-2023-10-23
 ```
 
-### Single Key Delay Encryption - Aggregator
 
-To test our test_aggregate_circuit test code, run
 
-```sh
-cargo test test_aggregate_circuit
+## Running Benchmarks
+
+This project includes benchmark tests for 'Aggregation Circuit'.
+
+
+### How to Run Benchmarks
+
+To run a specific benchmark test, use the `cargo bench` command followed by the `--bench` option with the name of the benchmark file you want to test. This command allows you to run targeted benchmark tests.
+
+#### Running the `aggregate_with_hash` Benchmark:
+
+```bash
+cargo bench --bench aggregate_with_hash
 ```
 
-## Bench
+## Running and Testing `delay_encryption` Feature
 
-To run all benches, run
+The `delay_encryption` feature is a key component of this project that focuses on implementing delayed encryption mechanisms. You can run and test this feature using Cargo, Rust's package manager and build tool.
 
-````bash
-cargo bench
-````
+### Running the Code
 
-To run a specific bench, run
+To run the `delay_encryption` related code, use the following command:
 
 ```bash
-cargo bench --bench $name
-````
+cargo run
+```
 
-For example, to run a bench `aggregate` defined in "benches" folder
-
+### Testing the Feature
+Use the following command to run this test:
 ```bash
-cargo bench --bench aggregate
+cargo test test_single_key_delay_encryption
 ```
