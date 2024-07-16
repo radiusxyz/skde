@@ -55,6 +55,11 @@ fn write_to_file<P: AsRef<Path>>(path: P, data: &[u8]) {
 }
 
 fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
+
+    use skde::{
+        aggregate_with_hash, AggregateWithHashCircuit, DecomposedExtractionKey, ExtractionKey,
+        ExtractionKey2, Poseidon, Spec, BITS_LEN, MAX_SEQUENCER_NUMBER, MAX_SEQUENCER_NUMBER2,
+    };
     // define prover and verifier names
     let prover_name = "Measure prover time in ".to_owned() + name;
     let verifier_name = "Measure verifier time in ".to_owned() + name;

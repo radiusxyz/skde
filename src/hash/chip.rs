@@ -85,7 +85,7 @@ impl<
 #[cfg(test)]
 mod tests {
     use crate::poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
-    use crate::{poseidon, PoseidonChip};
+    use crate::poseidon;
     use ff::FromUniformBytes;
     use halo2wrong::halo2::circuit::AssignedCell;
     use halo2wrong::halo2::circuit::{Layouter, SimpleFloorPlanner, Value};

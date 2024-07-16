@@ -12,7 +12,7 @@ pub use crate::aggregate_with_hash::*;
 pub mod poseidon;
 pub use crate::poseidon::*;
 pub mod hash;
-pub use crate::hash::*;
+// pub use crate::hash::*;
 use ff::PrimeField;
 use halo2wrong::{
     halo2::{
@@ -592,6 +592,7 @@ fn test_aggregate_circuit() {
 fn test_aggregate_with_hash_circuit() {
     use halo2wrong::curves::bn256::Fr;
     use num_bigint::RandomBits;
+    use maingate::mock_prover_verify;
     use rand::{thread_rng, Rng};
     let mut rng = thread_rng();
     let bits_len = AggregateWithHashCircuit::<Fr, 5, 4>::BITS_LEN as u64;

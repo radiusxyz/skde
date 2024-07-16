@@ -228,7 +228,7 @@ impl RefreshAux {
         let d = num_limbs_l + num_limbs_r - 1;
         let mut muled = Vec::new();
         for i in 0..d {
-            let mut j = if num_limbs_r >= i + 1 {
+            let mut j = if num_limbs_r > i {
                 0
             } else {
                 i + 1 - num_limbs_r

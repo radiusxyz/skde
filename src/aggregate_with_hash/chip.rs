@@ -1,14 +1,14 @@
 use crate::big_integer::{BigIntChip, BigIntConfig, BigIntInstructions};
 use crate::hash::chip::HasherChip;
 use crate::poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
-use crate::poseidon::Poseidon;
+use crate::poseidon::PoseidonChip;
 use crate::{
     AggregateWithHashExtractionKey, AggregateWithHashInstructions, AggregateWithHashPublicParams,
     AssignedAggregateWithHashExtractionKey, AssignedAggregateWithHashPartialKeys,
-    AssignedAggregateWithHashPublicParams, PoseidonChip, Spec,
+    AssignedAggregateWithHashPublicParams, Spec,
 };
-use halo2wrong::halo2::circuit::AssignedCell;
-use halo2wrong::halo2::plonk::{Column, Error, Instance};
+// use halo2wrong::halo2::circuit::AssignedCell;
+use halo2wrong::halo2::plonk::Error;
 use maingate::{MainGate, MainGateConfig, RangeChip, RegionCtx};
 
 use ff::{FromUniformBytes, PrimeField};
@@ -269,6 +269,7 @@ mod test {
     use ff::FromUniformBytes;
     use halo2wrong::halo2::circuit::{AssignedCell, Chip};
     use halo2wrong::halo2::dev::MockProver;
+    use crate::poseidon::Poseidon;
     use halo2wrong::halo2::{
         circuit::SimpleFloorPlanner,
         plonk::{Circuit, ConstraintSystem},

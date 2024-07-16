@@ -2,18 +2,18 @@ use ff::{FromUniformBytes, PrimeField};
 
 use halo2wrong::{
     halo2::{
-        circuit::{Layouter, SimpleFloorPlanner, Value},
-        plonk::{Circuit, ConstraintSystem, Error},
+        circuit::Value,
+        plonk::Error,
     },
     RegionCtx,
 };
 
 use maingate::{
-    mock_prover_verify, AssignedValue, MainGate, MainGateConfig, MainGateInstructions, Term,
+    AssignedValue, MainGate, MainGateConfig, MainGateInstructions, Term,
 };
 
-use poseidon::{Poseidon, SparseMDSMatrix, Spec, State};
-use rand_core::OsRng;
+use poseidon::{SparseMDSMatrix, Spec, State};
+// use rand_core::OsRng;
 
 use crate::poseidon;
 

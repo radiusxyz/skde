@@ -403,7 +403,7 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         for i in 0..d {
             // `acc` denotes the `i`-th limb of the returned integer.
             let mut acc = main_gate.assign_constant(ctx, big_to_fe(BigUint::default()))?;
-            let mut j = if d1 >= i + 1 { 0 } else { i + 1 - d1 };
+            let mut j = if d1 > i { 0 } else { i + 1 - d1 };
             while j < d0 && j <= i {
                 let k = i - j;
                 let a_limb = AssignedValue::from(a.limb(j));

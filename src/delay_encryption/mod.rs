@@ -1,6 +1,5 @@
 use std::{
     io::{self, ErrorKind},
-    ops::{Div, Mul, Rem, Sub},
     str::FromStr,
 };
 
@@ -313,7 +312,7 @@ pub fn solve_time_lock_puzzle(
     let n_square: BigUint = &skde_params.n * &skde_params.n;
 
     let one_big = BigUint::from(1u32);
-    let t = BigUint::from(skde_params.t.clone());
+    let t = BigUint::from(skde_params.t);
     let time: BigUint = BigUint::from(2u32).modpow(&t, &skde_params.n);
 
     let u_p = big_mul_mod(&aggregated_key.u, &aggregated_key.y, &skde_params.n);
@@ -418,8 +417,6 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
-
-    use std::time::Instant;
 
     #[test]
     fn test_single_key_delay_encryption() {
