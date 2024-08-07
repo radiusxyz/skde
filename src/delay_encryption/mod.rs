@@ -312,9 +312,10 @@ pub fn solve_time_lock_puzzle(
     let n_square: BigUint = &skde_params.n * &skde_params.n;
 
     let one_big = BigUint::from(1u32);
-    let t = BigUint::from(skde_params.t);
-    let time: BigUint = BigUint::from(2u32).modpow(&t, &skde_params.n);
-
+    // let t = BigUint::from(skde_params.t);
+    // let time: BigUint = BigUint::from(2u32).modpow(&t, &skde_params.n);
+    let time: BigUint = BigUint::from(2u32).pow(skde_params.t);
+    
     let u_p = big_mul_mod(&aggregated_key.u, &aggregated_key.y, &skde_params.n);
     let v_p = big_mul_mod(&aggregated_key.v, &aggregated_key.w, &n_square);
     let x = big_pow_mod(&u_p, &time, &skde_params.n);
