@@ -1,4 +1,6 @@
-use crate::aggregate::*;
+use crate::key_aggregation::*;
+use crate::key_generation::AssignedPartialKey;
+use crate::MAX_SEQUENCER_NUMBER;
 use big_integer::*;
 use ff::FromUniformBytes;
 use ff::PrimeField;
@@ -18,10 +20,13 @@ use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
 pub struct AggregateHashCircuit<F: PrimeField, const T: usize, const RATE: usize> {
-    pub partial_keys: Vec<ExtractionKey>,
-    pub n: BigUint,
     pub spec: Spec<F, T, RATE>,
+
+    pub n: BigUint,
     pub n_square: BigUint,
+
+    pub partial_key_list: Vec<PartialKey>,
+
     pub _f: PhantomData<F>,
 }
 
@@ -50,41 +55,40 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
     }
 
     fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
-        let limb_width = Self::LIMB_WIDTH;
-        let limb_count = Self::BITS_LEN / Self::LIMB_WIDTH;
-
         let main_gate_config = MainGate::<F>::configure(meta);
+
         let (composition_bit_lens, overflow_bit_lens) =
             AggregateHashChip::<F, T, RATE>::compute_range_lens(Self::BITS_LEN / Self::LIMB_WIDTH);
+
         let range_config = RangeChip::<F>::configure(
             meta,
             &main_gate_config,
             composition_bit_lens,
             overflow_bit_lens,
         );
+
         let (square_composition_bit_lens, square_overflow_bit_lens) =
             AggregateHashChip::<F, T, RATE>::compute_range_lens(
                 Self::BITS_LEN * 2 / Self::LIMB_WIDTH,
             );
+
         let square_range_config = RangeChip::<F>::configure(
             meta,
             &main_gate_config,
             square_composition_bit_lens,
             square_overflow_bit_lens,
         );
-        let bigint_config = BigIntConfig::new(range_config.clone(), main_gate_config.clone());
-        let bigint_square_config =
-            BigIntConfig::new(square_range_config.clone(), main_gate_config.clone());
-
-        let hash_config = main_gate_config.clone();
 
         Self::Config {
-            bigint_config,
-            bigint_square_config,
-            hash_config,
+            bigint_config: BigIntConfig::new(range_config.clone(), main_gate_config.clone()),
+            bigint_square_config: BigIntConfig::new(
+                square_range_config.clone(),
+                main_gate_config.clone(),
+            ),
+            hash_config: main_gate_config.clone(),
             instance: meta.instance_column(),
-            limb_width,
-            limb_count,
+            limb_width: Self::LIMB_WIDTH,
+            limb_count: Self::BITS_LEN / Self::LIMB_WIDTH,
         }
     }
 
@@ -95,14 +99,14 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
     ) -> Result<(), Error> {
         let limb_width = Self::LIMB_WIDTH;
         let num_limbs = Self::BITS_LEN / Self::LIMB_WIDTH;
-        let aggregate_with_hash_chip = self.aggregate_with_hash_chip(config.clone());
-        let bigint_chip = aggregate_with_hash_chip.bigint_chip();
-        let main_gate_chip = bigint_chip.main_gate();
-        let bigint_square_chip = aggregate_with_hash_chip.bigint_square_chip();
 
         let instances = config.instance;
 
-        // let instances = bigint_chip.get_instance();
+        let aggregate_with_hash_chip = self.aggregate_with_hash_chip(config.clone());
+
+        let bigint_chip = aggregate_with_hash_chip.bigint_chip();
+        let bigint_square_chip = aggregate_with_hash_chip.bigint_square_chip();
+        let main_gate_chip = bigint_chip.main_gate();
 
         let (u_out, v_out, y_out, w_out) = layouter.assign_region(
             || "Pick 2048bit u for partial keys",
@@ -115,14 +119,17 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
                 let mut w_out = vec![];
 
                 for i in 0..MAX_SEQUENCER_NUMBER {
-                    let u_limbs =
-                        decompose_big::<F>(self.partial_keys[i].u.clone(), num_limbs, limb_width);
+                    let u_limbs = decompose_big::<F>(
+                        self.partial_key_list[i].u.clone(),
+                        num_limbs,
+                        limb_width,
+                    );
                     let u_unassigned = UnassignedInteger::from(u_limbs);
                     let u_assigned = bigint_chip.assign_integer(ctx, u_unassigned)?;
                     u_out.push(u_assigned);
 
                     let v_limbs = decompose_big::<F>(
-                        self.partial_keys[i].v.clone(),
+                        self.partial_key_list[i].v.clone(),
                         num_limbs * 2,
                         limb_width,
                     );
@@ -130,14 +137,17 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
                     let v_assigned = bigint_square_chip.assign_integer(ctx, v_unassigned)?;
                     v_out.push(v_assigned);
 
-                    let y_limbs =
-                        decompose_big::<F>(self.partial_keys[i].y.clone(), num_limbs, limb_width);
+                    let y_limbs = decompose_big::<F>(
+                        self.partial_key_list[i].y.clone(),
+                        num_limbs,
+                        limb_width,
+                    );
                     let y_unassigned = UnassignedInteger::from(y_limbs);
                     let y_assigned = bigint_chip.assign_integer(ctx, y_unassigned)?;
                     y_out.push(y_assigned);
 
                     let w_limbs = decompose_big::<F>(
-                        self.partial_keys[i].w.clone(),
+                        self.partial_key_list[i].w.clone(),
                         num_limbs * 2,
                         limb_width,
                     );
@@ -169,6 +179,7 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
                 let base2 = main_gate_chip.mul(ctx, &base1, &base1)?;
 
                 let mut hash_out = vec![];
+
                 for i in 0..MAX_SEQUENCER_NUMBER {
                     let u = u_out[i].clone();
                     for j in 0..u.num_limbs() / 3 {
@@ -267,7 +278,7 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
 
                 let mut partial_keys_assigned = vec![];
                 for i in 0..MAX_SEQUENCER_NUMBER {
-                    let assigned_extraction_key = AssignedExtractionKey::new(
+                    let assigned_extraction_key = AssignedPartialKey::new(
                         u_out[i].clone(),
                         v_out[i].clone(),
                         y_out[i].clone(),
@@ -275,17 +286,17 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
                     );
                     partial_keys_assigned.push(assigned_extraction_key);
                 }
-                let partial_keys = AssignedAggregatePartialKeys {
+                let partial_keys = AssignedExtractionKey {
                     partial_keys: partial_keys_assigned,
                 };
 
-                let public_params_unassigned = UnassignedAggregatePublicParams {
+                let public_params_unassigned = UnassignedKeyAggregationPublicParams {
                     n: n_unassigned.clone(),
                     n_square: n_square_unassigned.clone(),
                 };
                 let public_params =
                     aggregate_with_hash_chip.assign_public_params(ctx, public_params_unassigned)?;
-                let valid_aggregated_key = aggregate_with_hash_chip.aggregate(
+                let valid_aggregated_key = aggregate_with_hash_chip.aggregate_key(
                     ctx,
                     &partial_keys.clone(),
                     &public_params.clone(),
@@ -327,7 +338,7 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
 
 #[cfg(test)]
 mod tests {
-    use crate::aggregate::*;
+    use crate::key_aggregation::*;
 
     use crate::MAX_SEQUENCER_NUMBER;
 
@@ -346,10 +357,10 @@ mod tests {
         use num_bigint::RandomBits;
         use rand::{thread_rng, Rng};
         let mut rng = thread_rng();
-        let bits_len = AggregateHashCircuit::<Fr, 5, 4>::BITS_LEN as u64;
+        let bit_len = AggregateHashCircuit::<Fr, 5, 4>::BITS_LEN as u64;
         let mut n = BigUint::default();
-        while n.bits() != bits_len {
-            n = rng.sample(RandomBits::new(bits_len));
+        while n.bits() != bit_len {
+            n = rng.sample(RandomBits::new(bit_len));
         }
         let n_square = &n * &n;
 
@@ -357,7 +368,7 @@ mod tests {
 
         let mut partial_keys = vec![];
 
-        let mut aggregated_key = ExtractionKey {
+        let mut aggregated_key = PartialKey {
             u: BigUint::from(1usize),
             v: BigUint::from(1usize),
             y: BigUint::from(1usize),
@@ -365,12 +376,12 @@ mod tests {
         };
 
         for _ in 0..MAX_SEQUENCER_NUMBER {
-            let u = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
-            let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
-            let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
-            let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
+            let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
+            let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
+            let y = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
+            let w = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
 
-            partial_keys.push(ExtractionKey {
+            partial_keys.push(PartialKey {
                 u: u.clone(),
                 v: v.clone(),
                 y: y.clone(),
@@ -458,7 +469,7 @@ mod tests {
         }
 
         let circuit = AggregateHashCircuit::<Fr, 5, 4> {
-            partial_keys,
+            partial_key_list: partial_keys,
             n,
             spec,
             n_square,

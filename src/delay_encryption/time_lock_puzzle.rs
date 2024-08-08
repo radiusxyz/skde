@@ -1,25 +1,27 @@
 use std::io::{self, ErrorKind};
 
+use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod, can_be_divided};
 use num_bigint::BigUint;
+use num_traits::One;
 
-use super::{
-    big_mod_inv, big_mul_mod, big_pow_mod, can_be_divided, ExtractionKey, SecretKey,
-    SingleKeyDelayEncryptionParam,
-};
+use crate::{key_generation::PartialKey, SingleKeyDelayEncryptionParam};
+
+use super::SecretKey;
 
 pub fn solve_time_lock_puzzle(
     skde_params: &SingleKeyDelayEncryptionParam,
-    aggregated_key: &ExtractionKey,
+    partial_key: &PartialKey,
 ) -> io::Result<SecretKey> {
     let n_square: BigUint = &skde_params.n * &skde_params.n;
 
-    let one_big = BigUint::from(1u32);
+    let one_big = BigUint::one();
     let time: BigUint = BigUint::from(2u32).pow(skde_params.t);
 
-    let u_p = big_mul_mod(&aggregated_key.u, &aggregated_key.y, &skde_params.n);
-    let v_p = big_mul_mod(&aggregated_key.v, &aggregated_key.w, &n_square);
+    let u_p = big_mul_mod(&partial_key.u, &partial_key.y, &skde_params.n);
+    let v_p = big_mul_mod(&partial_key.v, &partial_key.w, &n_square);
+
     let x = big_pow_mod(&u_p, &time, &skde_params.n);
-    let x_pow_n = x.modpow(&skde_params.n, &n_square);
+    let x_pow_n = big_pow_mod(&x, &skde_params.n, &n_square);
     let x_pow_n_inv = big_mod_inv(&x_pow_n, &n_square).unwrap();
     let result = big_mul_mod(&v_p, &x_pow_n_inv, &n_square);
     let result = result - &one_big;

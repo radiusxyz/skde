@@ -6,10 +6,8 @@ use crate::{
 };
 use halo2wrong::halo2::{circuit::Value, plonk::Error};
 use maingate::{
-    big_to_fe, decompose_big, fe_to_big,
-    halo2::plonk::{Column, Instance},
-    AssignedValue, MainGate, MainGateConfig, MainGateInstructions, RangeChip, RangeConfig,
-    RangeInstructions, RegionCtx,
+    big_to_fe, decompose_big, fe_to_big, AssignedValue, MainGate, MainGateConfig,
+    MainGateInstructions, RangeChip, RangeConfig, RangeInstructions, RegionCtx,
 };
 
 use num_bigint::BigUint;
@@ -1177,9 +1175,9 @@ impl<F: PrimeField> BigIntChip<F> {
     ///
     /// # Return values
     /// Returns a new [`BigIntChip`]
-    pub fn new(config: BigIntConfig, limb_width: usize, bits_len: usize) -> Self {
-        assert_eq!(bits_len % limb_width, 0);
-        let num_limbs = bits_len / limb_width;
+    pub fn new(config: BigIntConfig, limb_width: usize, bit_size: usize) -> Self {
+        assert_eq!(bit_size % limb_width, 0);
+        let num_limbs = bit_size / limb_width;
         let max_word = Self::compute_mul_word_max(limb_width, num_limbs);
         assert!(Self::bits_size(&max_word) <= F::NUM_BITS as usize);
         BigIntChip {

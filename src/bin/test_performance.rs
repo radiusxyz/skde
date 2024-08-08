@@ -1,28 +1,34 @@
-use std::time::Instant;
+use std::{str::FromStr, time::Instant};
 
-use delay_encryption::{
-    aggregate_key_pairs, decrypt, encrypt, key_generation_with_proof, setup,
-    solve_time_lock_puzzle, verify_key_validity, PublicKey,
-};
+use delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle, PublicKey};
+use key_aggregation::aggregate_key_pairs;
+use key_generation::{generate_key, prove_partial_key_validity, verify_partial_key_validity};
+use num_bigint::BigUint;
 use skde::*;
 
 fn main() {
     let time = 2_u32.pow(TIME_PARAM_T);
-    let skde_params = setup(time);
+    let p = BigUint::from_str(PRIME_P).expect("Invalid PRIME_P");
+    let q = BigUint::from_str(PRIME_Q).expect("Invalid PRIME_Q");
+    let g = BigUint::from_str(GENERATOR).expect("Invalid GENERATOR");
+    let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
+
+    let skde_params = setup(time, p, q, g, max_sequencer_number);
     let message: &str = "12345";
 
     let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
         .enumerate()
         .map(|(index, _)| {
             let start = Instant::now();
-            let result = key_generation_with_proof(skde_params.clone());
+            let (secret_value, extraction_key) = generate_key(skde_params.clone());
+            let key_proof = prove_partial_key_validity(&skde_params, &secret_value);
             let generation_duration = start.elapsed();
             println!(
                 "Sequencer{}'s key and proof generation time: {:?}",
                 index + 1,
                 generation_duration
             );
-            result
+            (extraction_key, key_proof)
         })
         .collect();
 
@@ -32,7 +38,11 @@ fn main() {
         .iter()
         .for_each(|(extraction_key, key_proof)| {
             assert!(
-                verify_key_validity(&skde_params, extraction_key.clone(), key_proof.clone()),
+                verify_partial_key_validity(
+                    &skde_params,
+                    extraction_key.clone(),
+                    key_proof.clone()
+                ),
                 "Key verification failed"
             );
         });
@@ -50,7 +60,7 @@ fn main() {
 
     // Aggregate all generated keys
     let aggregation_start = Instant::now();
-    let aggregated_key = aggregate_key_pairs(&extraction_keys, &skde_params);
+    let aggregated_key = aggregate_key_pairs(&skde_params, &extraction_keys);
     let aggregation_duration = aggregation_start.elapsed();
     println!("Aggregation time: {:?}", aggregation_duration);
 

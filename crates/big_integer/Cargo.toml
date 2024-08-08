@@ -14,3 +14,4 @@ ff = { workspace = true }
 num-bigint = { workspace = true }
 rand = { workspace = true }
 poseidon = { workspace = true }
+num-traits = { workspace = true }

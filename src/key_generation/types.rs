@@ -5,26 +5,32 @@ use maingate::{decompose_big, halo2::circuit::Value};
 use num_bigint::BigUint;
 
 #[derive(Debug, Clone)]
-pub struct ExtractionKey {
+pub struct SecretValue {
+    pub r: BigUint,
+    pub s: BigUint,
+    pub k: BigUint,
+}
+
+#[derive(Debug, Clone)]
+pub struct PartialKey {
     pub u: BigUint,
     pub v: BigUint,
     pub y: BigUint,
     pub w: BigUint,
 }
-impl ExtractionKey {
-    pub fn decompose_extraction_key<F: PrimeField>(
-        extraction_keys: &ExtractionKey,
+
+impl PartialKey {
+    pub fn decompose_partial_key<F: PrimeField>(
+        partial_key: &PartialKey,
         limb_width: usize,
         limb_count: usize,
-    ) -> DecomposedExtractionKey<F> {
-        let decomposed_u = decompose_big::<F>(extraction_keys.u.clone(), limb_count, limb_width);
-        let decomposed_v =
-            decompose_big::<F>(extraction_keys.v.clone(), limb_count * 2, limb_width);
-        let decomposed_y = decompose_big::<F>(extraction_keys.y.clone(), limb_count, limb_width);
-        let decomposed_w =
-            decompose_big::<F>(extraction_keys.w.clone(), limb_count * 2, limb_width);
+    ) -> DecomposedPartialKey<F> {
+        let decomposed_u = decompose_big::<F>(partial_key.u.clone(), limb_count, limb_width);
+        let decomposed_v = decompose_big::<F>(partial_key.v.clone(), limb_count * 2, limb_width);
+        let decomposed_y = decompose_big::<F>(partial_key.y.clone(), limb_count, limb_width);
+        let decomposed_w = decompose_big::<F>(partial_key.w.clone(), limb_count * 2, limb_width);
 
-        DecomposedExtractionKey {
+        DecomposedPartialKey {
             u_limbs: decomposed_u,
             v_limbs: decomposed_v,
             y_limbs: decomposed_y,
@@ -33,14 +39,15 @@ impl ExtractionKey {
     }
 
     pub fn decompose_and_combine_all_partial_keys<F: PrimeField>(
-        extraction_keys: Vec<ExtractionKey>,
+        partial_key_list: Vec<PartialKey>,
         limb_width: usize,
         limb_count: usize,
     ) -> Vec<F> {
         let mut combined_partial = Vec::new();
 
-        for key in extraction_keys {
-            let decomposed_key = Self::decompose_extraction_key::<F>(&key, limb_width, limb_count);
+        for partial_key in partial_key_list {
+            let decomposed_key =
+                Self::decompose_partial_key::<F>(&partial_key, limb_width, limb_count);
             let combined_partial_limbs = decomposed_key.combine_limbs();
             combined_partial.extend(combined_partial_limbs)
         }
@@ -51,14 +58,14 @@ impl ExtractionKey {
 
 /// AggregateWithHash extraction key that is about to be assigned.
 #[derive(Clone, Debug)]
-pub struct UnassignedExtractionKey<F: PrimeField> {
+pub struct UnassignedPartialKey<F: PrimeField> {
     pub u: UnassignedInteger<F>,
     pub v: UnassignedInteger<F>,
     pub y: UnassignedInteger<F>,
     pub w: UnassignedInteger<F>,
 }
 
-impl<F: PrimeField> UnassignedExtractionKey<F> {
+impl<F: PrimeField> UnassignedPartialKey<F> {
     pub fn new(
         u: UnassignedInteger<F>,
         v: UnassignedInteger<F>,
@@ -80,14 +87,14 @@ impl<F: PrimeField> UnassignedExtractionKey<F> {
 
 /// An assigned AggregateWithHash extraction key.
 #[derive(Clone, Debug)]
-pub struct AssignedExtractionKey<F: PrimeField> {
+pub struct AssignedPartialKey<F: PrimeField> {
     pub u: AssignedInteger<F, Fresh>,
     pub v: AssignedInteger<F, Fresh>,
     pub y: AssignedInteger<F, Fresh>,
     pub w: AssignedInteger<F, Fresh>,
 }
 
-impl<F: PrimeField> AssignedExtractionKey<F> {
+impl<F: PrimeField> AssignedPartialKey<F> {
     pub fn new(
         u: AssignedInteger<F, Fresh>,
         v: AssignedInteger<F, Fresh>,
@@ -100,14 +107,14 @@ impl<F: PrimeField> AssignedExtractionKey<F> {
 
 /// ???
 #[derive(Clone, Debug)]
-pub struct DecomposedExtractionKey<F: PrimeField> {
+pub struct DecomposedPartialKey<F: PrimeField> {
     pub u_limbs: Vec<F>,
     pub v_limbs: Vec<F>,
     pub y_limbs: Vec<F>,
     pub w_limbs: Vec<F>,
 }
 
-impl<F: PrimeField> DecomposedExtractionKey<F> {
+impl<F: PrimeField> DecomposedPartialKey<F> {
     pub fn combine_limbs(self) -> Vec<F> {
         let mut combined = Vec::new();
 

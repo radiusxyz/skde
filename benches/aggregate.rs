@@ -20,9 +20,9 @@ use halo2wrong::halo2::{
 use num_bigint::{BigUint, RandomBits};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
-use skde::aggregate::{DecomposedExtractionKey, BITS_LEN};
-use skde::delay_encryption::{ExtractionKey, MAX_SEQUENCER_NUMBER};
-use skde::AggregateCircuit;
+use skde::key_aggregation::AggregateRawCircuit;
+use skde::key_generation::{DecomposedPartialKey, PartialKey};
+use skde::MAX_SEQUENCER_NUMBER;
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufReader, Read, Write},
@@ -70,16 +70,20 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
         ParamsKZG::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
 
     let mut rng = thread_rng();
-    let bits_len = BITS_LEN as u64;
+    let bits_len = AggregateRawCircuit::<Fr>::BITS_LEN as u64;
+
+    let limb_width = AggregateRawCircuit::<Fr>::LIMB_WIDTH;
+    let limb_count = AggregateRawCircuit::<Fr>::BITS_LEN / AggregateRawCircuit::<Fr>::LIMB_WIDTH;
+
     let mut n = BigUint::default();
     while n.bits() != bits_len {
         n = rng.sample(RandomBits::new(bits_len));
     }
     let n_square = &n * &n;
 
-    let mut partial_keys = vec![];
+    let mut partial_key_list = vec![];
 
-    let mut aggregated_key = ExtractionKey {
+    let mut aggregated_key = PartialKey {
         u: BigUint::from(1usize),
         v: BigUint::from(1usize),
         y: BigUint::from(1usize),
@@ -92,7 +96,7 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
         let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
         let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
 
-        partial_keys.push(ExtractionKey {
+        partial_key_list.push(PartialKey {
             u: u.clone(),
             v: v.clone(),
             y: y.clone(),
@@ -106,19 +110,22 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
     }
 
     // set public input
-    let combined_partial_limbs: Vec<Fr> =
-        ExtractionKey::decompose_and_combine_all_partial_keys(partial_keys.clone());
+    let combined_partial_limbs: Vec<Fr> = PartialKey::decompose_and_combine_all_partial_keys(
+        partial_key_list.clone(),
+        limb_width,
+        limb_count,
+    );
 
-    let decomposed_extraction_key: DecomposedExtractionKey<Fr> =
-        ExtractionKey::decompose_extraction_key(&aggregated_key.clone());
-    let mut combined_limbs = decomposed_extraction_key.combine_limbs();
+    let decomposed_partial_key: DecomposedPartialKey<Fr> =
+        PartialKey::decompose_partial_key(&aggregated_key.clone(), limb_width, limb_count);
+    let mut combined_limbs = decomposed_partial_key.combine_limbs();
 
     combined_limbs.extend(combined_partial_limbs);
 
     let public_inputs = [combined_limbs.as_slice()];
 
-    let circuit = AggregateCircuit::<Fr> {
-        partial_keys,
+    let circuit = AggregateRawCircuit::<Fr> {
+        partial_key_list,
         aggregated_key,
         n,
         n_square,
@@ -139,7 +146,7 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
     write_to_file(&vk_path, &buf);
 
     let vk_fs = File::open(vk_path).expect("Failed to load vk");
-    let vk = VerifyingKey::<G1Affine>::read::<BufReader<File>, AggregateCircuit<Fr>>(
+    let vk = VerifyingKey::<G1Affine>::read::<BufReader<File>, AggregateRawCircuit<Fr>>(
         &mut BufReader::new(vk_fs),
         SerdeFormat::RawBytes,
     )
@@ -159,7 +166,7 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
     write_to_file(&pk_path, &buf);
 
     let pk_fs = File::open(pk_path).expect("Failed to load pk");
-    let pk = ProvingKey::<G1Affine>::read::<BufReader<File>, AggregateCircuit<Fr>>(
+    let pk = ProvingKey::<G1Affine>::read::<BufReader<File>, AggregateRawCircuit<Fr>>(
         &mut BufReader::new(pk_fs),
         SerdeFormat::RawBytes,
     )

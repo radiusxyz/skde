@@ -19,12 +19,13 @@ use halo2wrong::halo2::{
 use maingate::{big_to_fe, decompose_big};
 
 use num_bigint::{BigUint, RandomBits};
+use poseidon::{Poseidon, Spec};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
-use skde::aggregate::MAX_SEQUENCER_NUMBER2;
-use skde::delay_encryption::ExtractionKey;
-use skde::poseidon::{Poseidon, Spec};
-use skde::AggregateWithHashCircuit;
+use skde::key_aggregation::AggregateHashCircuit;
+use skde::key_generation::PartialKey;
+use skde::MAX_SEQUENCER_NUMBER;
+
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufReader, Read, Write},
@@ -72,7 +73,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         ParamsKZG::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
 
     let mut rng = thread_rng();
-    let bits_len = AggregateWithHashCircuit::<Fr, 5, 4>::BITS_LEN as u64;
+    let bits_len = AggregateHashCircuit::<Fr, 5, 4>::BITS_LEN as u64;
     let mut n = BigUint::default();
     while n.bits() != bits_len {
         n = rng.sample(RandomBits::new(bits_len));
@@ -81,22 +82,22 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
 
     let spec = Spec::<Fr, 5, 4>::new(8, 57);
 
-    let mut partial_keys = vec![];
+    let mut partial_key_list = vec![];
 
-    let mut aggregated_key = ExtractionKey {
+    let mut aggregated_key = PartialKey {
         u: BigUint::from(1usize),
         v: BigUint::from(1usize),
         y: BigUint::from(1usize),
         w: BigUint::from(1usize),
     };
 
-    for _ in 0..MAX_SEQUENCER_NUMBER2 {
+    for _ in 0..MAX_SEQUENCER_NUMBER {
         let u = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
         let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
         let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
         let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
 
-        partial_keys.push(ExtractionKey {
+        partial_key_list.push(PartialKey {
             u: u.clone(),
             v: v.clone(),
             y: y.clone(),
@@ -112,7 +113,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
     let mut ref_hasher = Poseidon::<Fr, 5, 4>::new_hash(8, 57);
     let base1: Fr = big_to_fe(BigUint::from(
         2_u128.pow(
-            (AggregateWithHashCircuit::<Fr, 5, 4>::LIMB_WIDTH as u128)
+            (AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH as u128)
                 .try_into()
                 .unwrap(),
         ),
@@ -121,12 +122,12 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
 
     let mut hashes = vec![];
 
-    let limb_width = AggregateWithHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
-    let num_limbs = AggregateWithHashCircuit::<Fr, 5, 4>::BITS_LEN
-        / AggregateWithHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
+    let limb_width = AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
+    let num_limbs =
+        AggregateHashCircuit::<Fr, 5, 4>::BITS_LEN / AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
 
-    for i in 0..MAX_SEQUENCER_NUMBER2 {
-        let u = partial_keys[i].u.clone();
+    for i in 0..MAX_SEQUENCER_NUMBER {
+        let u = partial_key_list[i].u.clone();
         let u_limbs = decompose_big::<Fr>(u.clone(), num_limbs, limb_width);
         for i in 0..(num_limbs / 3) {
             let mut u_compose = u_limbs[3 * i];
@@ -140,7 +141,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         let e = u_compose;
         ref_hasher.update(&[e.clone()]);
 
-        let v = partial_keys[i].v.clone();
+        let v = partial_key_list[i].v.clone();
         let v_limbs = decompose_big::<Fr>(v.clone(), num_limbs * 2, limb_width);
         for i in 0..(num_limbs * 2 / 3) {
             let mut v_compose = v_limbs[3 * i];
@@ -153,7 +154,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         let e = v_compose;
         ref_hasher.update(&[e.clone()]);
 
-        let y = partial_keys[i].y.clone();
+        let y = partial_key_list[i].y.clone();
         let y_limbs = decompose_big::<Fr>(y.clone(), num_limbs, limb_width);
         for i in 0..(num_limbs / 3) {
             let mut y_compose = y_limbs[3 * i];
@@ -166,7 +167,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         let e = y_compose;
         ref_hasher.update(&[e.clone()]);
 
-        let w = partial_keys[i].w.clone();
+        let w = partial_key_list[i].w.clone();
         let w_limbs = decompose_big::<Fr>(w.clone(), num_limbs * 2, limb_width);
         for i in 0..(num_limbs * 2 / 3) {
             let mut w_compose = w_limbs[3 * i];
@@ -183,8 +184,8 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         hashes.push(hash[2]);
     }
 
-    let circuit = AggregateWithHashCircuit::<Fr, 5, 4> {
-        partial_keys,
+    let circuit = AggregateHashCircuit::<Fr, 5, 4> {
+        partial_key_list,
         n,
         spec,
         n_square,
@@ -229,7 +230,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
     write_to_file(&vk_path, &buf);
 
     let vk_fs = File::open(vk_path).expect("Failed to load vk");
-    let vk = VerifyingKey::<G1Affine>::read::<BufReader<File>, AggregateWithHashCircuit<Fr, 5, 4>>(
+    let vk = VerifyingKey::<G1Affine>::read::<BufReader<File>, AggregateHashCircuit<Fr, 5, 4>>(
         &mut BufReader::new(vk_fs),
         SerdeFormat::RawBytes,
     )
@@ -249,7 +250,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
     write_to_file(&pk_path, &buf);
 
     let pk_fs = File::open(pk_path).expect("Failed to load pk");
-    let pk = ProvingKey::<G1Affine>::read::<BufReader<File>, AggregateWithHashCircuit<Fr, 5, 4>>(
+    let pk = ProvingKey::<G1Affine>::read::<BufReader<File>, AggregateHashCircuit<Fr, 5, 4>>(
         &mut BufReader::new(pk_fs),
         SerdeFormat::RawBytes,
     )

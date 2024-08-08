@@ -20,8 +20,8 @@ pub struct AggregateRawConfig {
 pub struct AggregateHashConfig {
     pub bigint_config: BigIntConfig,
     pub bigint_square_config: BigIntConfig,
-
     pub hash_config: MainGateConfig,
+
     pub instance: Column<Instance>,
 
     pub limb_count: usize,

@@ -1,64 +1,40 @@
-use std::str::FromStr;
-
+use big_integer::{big_mul_mod, big_pow_mod};
 use num_bigint::BigUint;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use sha2::{Digest, Sha512};
 
-use crate::{GENERATOR, MAX_SEQUENCER_NUMBER, PRIME_P, PRIME_Q};
+use crate::{util::generate_random_biguint, SingleKeyDelayEncryptionParam, MAX_SEQUENCER_NUMBER};
 
 use super::{
-    big_mul_mod, big_pow_mod, calculate_challenge, generate_random_biguint, generate_uv_pair,
-    pow_mod, ExtractionKey, KeyProof, SingleKeyDelayEncryptionParam,
+    generate_uv_pair,
+    types::{PartialKey, SecretValue},
 };
 
-pub fn setup(t: u32) -> SingleKeyDelayEncryptionParam {
-    let p = BigUint::from_str(PRIME_P).expect("Invalid PRIME_P");
-    let q = BigUint::from_str(PRIME_Q).expect("Invalid PRIME_Q");
-    let g = BigUint::from_str(GENERATOR).expect("Invalid GENERATOR");
-
-    let n = p * q;
-    let h = pow_mod(&g, t, &n);
-
-    SingleKeyDelayEncryptionParam { n, g, t, h }
+#[derive(Debug, Clone)]
+pub struct UVPair {
+    pub u: BigUint,
+    pub v: BigUint,
 }
 
-pub fn key_generation_with_proof(
-    skde_params: SingleKeyDelayEncryptionParam,
-) -> (ExtractionKey, KeyProof) {
-    let two_big: BigUint = BigUint::from(2u32);
-
-    let n_half: BigUint = &skde_params.n / two_big;
-    let n_half_over_m: BigUint = &n_half / MAX_SEQUENCER_NUMBER;
-
-    let r = generate_random_biguint(n_half_over_m.bits());
-    let s = generate_random_biguint(n_half_over_m.bits());
-    let k = generate_random_biguint(n_half.bits());
-
-    let uv_pair = generate_uv_pair(&(&r + &s), &s, &skde_params);
-    let yw_pair = generate_uv_pair(&k, &r, &skde_params);
-
-    // proof generation for validity for the key pairs
-
-    // TODO: Range proof generation using SNARK
-    let key_proof = prove_key_validity(&skde_params, &r, &s, &k);
-
-    (
-        ExtractionKey {
-            u: uv_pair.u,
-            v: uv_pair.v,
-            y: yw_pair.u,
-            w: yw_pair.v,
-        },
-        key_proof,
-    )
+#[derive(Debug, Clone)]
+pub struct PartialKeyProof {
+    pub a: BigUint,
+    pub b: BigUint,
+    pub tau: BigUint,
+    pub alpha: BigUint,
+    pub beta: BigUint,
 }
 
-fn prove_key_validity(
+pub fn prove_partial_key_validity(
     skde_params: &SingleKeyDelayEncryptionParam,
-    r: &BigUint,
-    s: &BigUint,
-    k: &BigUint,
-) -> KeyProof {
+    secret_value: &SecretValue,
+) -> PartialKeyProof {
+    let r = &secret_value.r;
+    let s = &secret_value.s;
+    let k = &secret_value.k;
+
     let two_big = BigUint::from(2u32);
+
     let t = BigUint::from(skde_params.t);
     let n_half = &skde_params.n / &two_big;
     let n_half_plus_n_over_m = &n_half + (&skde_params.n / MAX_SEQUENCER_NUMBER);
@@ -67,8 +43,10 @@ fn prove_key_validity(
     let l = generate_random_biguint(n_half.bits());
 
     let ab_pair = generate_uv_pair(&x, &l, skde_params);
+
     let a = ab_pair.u;
     let b = ab_pair.v;
+
     let tau = big_pow_mod(&skde_params.g, &l, &skde_params.n);
 
     // Calculate SHA-512 hash
@@ -87,7 +65,7 @@ fn prove_key_validity(
     let alpha = (r + s + k) * &e + &x;
     let beta = (r + s) * &e + &l;
 
-    KeyProof {
+    PartialKeyProof {
         a,
         b,
         tau,
@@ -96,25 +74,25 @@ fn prove_key_validity(
     }
 }
 
-pub fn verify_key_validity(
+pub fn verify_partial_key_validity(
     skde_params: &SingleKeyDelayEncryptionParam,
-    extraction_key: ExtractionKey,
-    key_proof: KeyProof,
+    partial_key: PartialKey,
+    partial_key_proof: PartialKeyProof,
 ) -> bool {
     let t = BigUint::from(skde_params.t);
     let n_square: BigUint = &skde_params.n * &skde_params.n;
     let one_big = BigUint::from(1u32);
 
-    let a = key_proof.a;
-    let b = key_proof.b;
-    let tau = key_proof.tau;
-    let alpha = key_proof.alpha;
-    let beta = key_proof.beta;
+    let a = partial_key_proof.a;
+    let b = partial_key_proof.b;
+    let tau = partial_key_proof.tau;
+    let alpha = partial_key_proof.alpha;
+    let beta = partial_key_proof.beta;
 
-    let u = &extraction_key.u;
-    let v = &extraction_key.v;
-    let y = &extraction_key.y;
-    let w = &extraction_key.w;
+    let u = &partial_key.u;
+    let v = &partial_key.v;
+    let y = &partial_key.y;
+    let w = &partial_key.w;
 
     // Calculate SHA-512 hash for the challenge
     let transcript = vec![
@@ -154,4 +132,16 @@ pub fn verify_key_validity(
 
     // Parallel verification of lhs and rhs vectors
     lhs.par_iter().zip(rhs.par_iter()).all(|(l, r)| l == r)
+}
+
+pub fn calculate_challenge(values: &[&BigUint]) -> BigUint {
+    let mut sha = Sha512::new();
+
+    for value in values {
+        sha.update(&value.to_bytes_be());
+    }
+
+    let hash = sha.finalize();
+
+    BigUint::from_bytes_be(&hash)
 }
