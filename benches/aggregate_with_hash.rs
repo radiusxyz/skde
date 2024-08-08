@@ -21,7 +21,8 @@ use maingate::{big_to_fe, decompose_big};
 use num_bigint::{BigUint, RandomBits};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
-use skde::aggregate_with_hash::{ExtractionKey2, MAX_SEQUENCER_NUMBER2};
+use skde::aggregate::MAX_SEQUENCER_NUMBER2;
+use skde::delay_encryption::ExtractionKey;
 use skde::poseidon::{Poseidon, Spec};
 use skde::AggregateWithHashCircuit;
 use std::{
@@ -82,7 +83,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
 
     let mut partial_keys = vec![];
 
-    let mut aggregated_key = ExtractionKey2 {
+    let mut aggregated_key = ExtractionKey {
         u: BigUint::from(1usize),
         v: BigUint::from(1usize),
         y: BigUint::from(1usize),
@@ -95,7 +96,7 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
         let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
 
-        partial_keys.push(ExtractionKey2 {
+        partial_keys.push(ExtractionKey {
             u: u.clone(),
             v: v.clone(),
             y: y.clone(),

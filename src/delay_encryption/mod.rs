@@ -1,16 +1,20 @@
 mod cryptography;
 mod single_key_delay_encryption_zkp;
+mod time_lock_puzzle;
 mod types;
 mod util;
 
 pub use cryptography::*;
 pub use single_key_delay_encryption_zkp::*;
+pub use time_lock_puzzle::*;
 pub use types::*;
 pub use util::*;
 
 use num_bigint::BigUint;
 use num_traits::One;
 use sha2::{Digest, Sha512};
+
+use crate::aggregate::ExtractionKey;
 
 // Input: (a, b, skde_params = (n, g, t, h))
 // Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
@@ -54,10 +58,12 @@ pub fn aggregate_key_pairs(
     skde_params: &SingleKeyDelayEncryptionParam,
 ) -> ExtractionKey {
     let n_square = &skde_params.n * &skde_params.n;
-    let mut aggregated_u = BigUint::from(1u32);
-    let mut aggregated_v = BigUint::from(1u32);
-    let mut aggregated_y = BigUint::from(1u32);
-    let mut aggregated_w = BigUint::from(1u32);
+
+    let mut aggregated_u = BigUint::one();
+    let mut aggregated_v = BigUint::one();
+    let mut aggregated_y = BigUint::one();
+    let mut aggregated_w = BigUint::one();
+
     // Multiply each component of each ExtractionKey in the array
     for key in key_pairs {
         aggregated_u = big_mul_mod(&aggregated_u, &key.u, &skde_params.n);

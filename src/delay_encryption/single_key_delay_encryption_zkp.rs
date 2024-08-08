@@ -16,7 +16,6 @@ pub fn setup(t: u32) -> SingleKeyDelayEncryptionParam {
     let g = BigUint::from_str(GENERATOR).expect("Invalid GENERATOR");
 
     let n = p * q;
-
     let h = pow_mod(&g, t, &n);
 
     SingleKeyDelayEncryptionParam { n, g, t, h }
@@ -59,11 +58,10 @@ fn prove_key_validity(
     s: &BigUint,
     k: &BigUint,
 ) -> KeyProof {
-    let m = MAX_SEQUENCER_NUMBER;
     let two_big = BigUint::from(2u32);
     let t = BigUint::from(skde_params.t);
     let n_half = &skde_params.n / &two_big;
-    let n_half_plus_n_over_m = &n_half + (&skde_params.n / m);
+    let n_half_plus_n_over_m = &n_half + (&skde_params.n / MAX_SEQUENCER_NUMBER);
 
     let x = generate_random_biguint(n_half_plus_n_over_m.bits());
     let l = generate_random_biguint(n_half.bits());

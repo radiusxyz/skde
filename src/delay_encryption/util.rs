@@ -2,6 +2,11 @@ use num_bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
 use num_traits::{One, Zero};
 use rand::thread_rng;
 
+pub fn generate_random_biguint(bits_size: u64) -> BigUint {
+    let mut rng = thread_rng();
+    rng.gen_biguint(bits_size)
+}
+
 // compute h = g^{2^t} mod n
 pub fn pow_mod(g: &BigUint, t: u32, n: &BigUint) -> BigUint {
     let mut h = g.clone();
@@ -21,17 +26,12 @@ pub fn big_mul_mod(a: &BigUint, b: &BigUint, modulus: &BigUint) -> BigUint {
     (a * b) % modulus
 }
 
-pub fn is_divided(dividend: &BigUint, divisor: &BigUint) -> bool {
+pub fn can_be_divided(dividend: &BigUint, divisor: &BigUint) -> bool {
     if divisor == &BigUint::zero() {
         return false;
     }
 
     dividend % divisor == BigUint::zero()
-}
-
-pub fn generate_random_biguint(bits_size: u64) -> BigUint {
-    let mut rng = thread_rng();
-    rng.gen_biguint(bits_size)
 }
 
 pub fn big_mod_inv(a: &BigUint, m: &BigUint) -> Option<BigUint> {

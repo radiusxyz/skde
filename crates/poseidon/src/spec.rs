@@ -61,11 +61,6 @@ impl<F: PrimeField, const T: usize> State<F, T> {
     pub fn words(&self) -> [F; T] {
         self.0
     }
-
-    /// Second element of the state is the result
-    pub(crate) fn result(&self) -> F {
-        self.0[1]
-    }
 }
 
 /// `Spec` holds construction parameters as well as constants that are used in
