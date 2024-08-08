@@ -11,6 +11,6 @@ mod permutation;
 mod poseidon;
 mod spec;
 
-pub use crate::poseidon::chip::PoseidonChip;
-pub use crate::poseidon::poseidon::Poseidon;
-pub use crate::poseidon::spec::{MDSMatrices, MDSMatrix, SparseMDSMatrix, Spec, State};
+pub use chip::PoseidonChip;
+pub use poseidon::Poseidon;
+pub use spec::{MDSMatrices, MDSMatrix, SparseMDSMatrix, Spec, State};

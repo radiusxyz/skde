@@ -6,8 +6,10 @@ use crate::{
 };
 use halo2wrong::halo2::{circuit::Value, plonk::Error};
 use maingate::{
-    big_to_fe, decompose_big, fe_to_big, AssignedValue, MainGate, MainGateConfig,
-    MainGateInstructions, RangeChip, RangeConfig, RangeInstructions, RegionCtx,
+    big_to_fe, decompose_big, fe_to_big,
+    halo2::plonk::{Column, Instance},
+    AssignedValue, MainGate, MainGateConfig, MainGateInstructions, RangeChip, RangeConfig,
+    RangeInstructions, RegionCtx,
 };
 
 use num_bigint::BigUint;
@@ -1164,7 +1166,7 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
 // zeroknight - use ff::Primefield
 impl<F: PrimeField> BigIntChip<F> {
     /// The number of lookup column used in the [`RangeChip`].
-    pub(crate) const NUM_LOOKUP_LIMBS: usize = 8;
+    pub const NUM_LOOKUP_LIMBS: usize = 8;
 
     /// Create a new [`BigIntChip`] from the configuration and parameters.
     ///
@@ -1198,6 +1200,13 @@ impl<F: PrimeField> BigIntChip<F> {
         let main_gate_config = self.config.main_gate_config.clone();
         MainGate::<F>::new(main_gate_config)
     }
+
+    // pub fn get_instance(&self) -> Column<Instance> {
+    //     let a = self.config.main_gate_config.clone();
+
+    //     let b = MainGate::<F>::new(a);
+
+    // }
 
     /// Creates a new [`AssignedInteger`] from its limb representation.
     ///
@@ -1383,8 +1392,10 @@ mod test {
     //zeroknight
     use ff::{Field, FromUniformBytes};
 
-    use super::*;
     use crate::big_pow_mod;
+
+    use super::*;
+
     use halo2wrong::halo2::{
         circuit::SimpleFloorPlanner,
         plonk::{Circuit, ConstraintSystem},

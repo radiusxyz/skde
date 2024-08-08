@@ -1,12 +1,13 @@
-use crate::big_integer::{BigIntChip, BigIntConfig, BigIntInstructions};
-use crate::hash::chip::HasherChip;
-use crate::poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
-use crate::poseidon::PoseidonChip;
 use crate::{
     AggregateWithHashExtractionKey, AggregateWithHashInstructions, AggregateWithHashPublicParams,
     AssignedAggregateWithHashExtractionKey, AssignedAggregateWithHashPartialKeys,
-    AssignedAggregateWithHashPublicParams, Spec,
+    AssignedAggregateWithHashPublicParams, Spec, MAX_SEQUENCER_NUMBER,
 };
+use big_integer::{BigIntChip, BigIntConfig, BigIntInstructions};
+use hash::HasherChip;
+use maingate::halo2::plonk::{Column, Instance};
+use poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
+use poseidon::PoseidonChip;
 // use halo2wrong::halo2::circuit::AssignedCell;
 use halo2wrong::halo2::plonk::Error;
 use maingate::{MainGate, MainGateConfig, RangeChip, RegionCtx};
@@ -24,8 +25,6 @@ pub struct ExtractionKey2 {
     pub w: BigUint,
 }
 
-use super::MAX_SEQUENCER_NUMBER2;
-
 /// Configuration for [`BigIntChip`].
 #[derive(Clone, Debug)]
 pub struct AggregateWithHashConfig {
@@ -33,27 +32,7 @@ pub struct AggregateWithHashConfig {
     pub bigint_config: BigIntConfig,
     pub bigint_square_config: BigIntConfig,
     pub hash_config: MainGateConfig,
-}
-
-impl AggregateWithHashConfig {
-    /// Creates new [`AggregateWithHashConfig`] from [`BigIntConfig`].
-    ///
-    /// # Arguments
-    /// * bigint_config - a configuration for [`BigIntChip`].
-    ///
-    /// # Return values
-    /// Returns new [`AggregateWithHashConfig`].
-    pub fn new(
-        bigint_config: BigIntConfig,
-        bigint_square_config: BigIntConfig,
-        hash_config: MainGateConfig,
-    ) -> Self {
-        Self {
-            bigint_config,
-            bigint_square_config,
-            hash_config,
-        }
-    }
+    pub instance: Column<Instance>,
 }
 
 /// Chip for [`AggregateWithHashInstructions`].
@@ -142,7 +121,7 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
         let mut y = partial_keys.partial_keys[0].y.clone();
         let mut w = partial_keys.partial_keys[0].w.clone();
 
-        for i in 1..MAX_SEQUENCER_NUMBER2 {
+        for i in 1..MAX_SEQUENCER_NUMBER {
             u = bigint_chip.mul_mod(ctx, &u, &partial_keys.partial_keys[i].u, &public_params.n)?;
             v = bigint_square_chip.mul_mod(
                 ctx,
@@ -266,10 +245,10 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize>
 mod test {
 
     use super::*;
+    use big_integer::UnassignedInteger;
     use ff::FromUniformBytes;
-    use halo2wrong::halo2::circuit::{AssignedCell, Chip};
+
     use halo2wrong::halo2::dev::MockProver;
-    use crate::poseidon::Poseidon;
     use halo2wrong::halo2::{
         circuit::SimpleFloorPlanner,
         plonk::{Circuit, ConstraintSystem},
@@ -277,6 +256,7 @@ mod test {
     use maingate::{big_to_fe, decompose_big, MainGateInstructions, RangeInstructions};
     use num_bigint::BigUint;
     use num_bigint::RandomBits;
+    use poseidon::Poseidon;
     use rand::{thread_rng, Rng};
 
     macro_rules! impl_aggregate_with_hash_test_circuit{
@@ -338,6 +318,7 @@ mod test {
                         bigint_config,
                         bigint_square_config,
                         hash_config,
+                        instance: meta.instance_column(),
                     }
                 }
 
@@ -364,7 +345,7 @@ mod test {
                         u: BigUint::from(1usize), v: BigUint::from(1usize), y: BigUint::from(1usize), w: BigUint::from(1usize),
                     };
 
-                    for _ in 0..MAX_SEQUENCER_NUMBER2{
+                    for _ in 0..MAX_SEQUENCER_NUMBER{
                         let u = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
                         let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len*2)) % &n_square;
                         let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
@@ -390,7 +371,7 @@ mod test {
                     let limb_width = $circuit_name::<F, T, RATE>::LIMB_WIDTH;
                     let num_limbs = $circuit_name::<F, T, RATE>::BITS_LEN / $circuit_name::<F, T, RATE>::LIMB_WIDTH;
 
-                    for i in 0..MAX_SEQUENCER_NUMBER2 {
+                    for i in 0..MAX_SEQUENCER_NUMBER {
                         let u = partial_keys[i].u.clone();
                         let u_limbs = decompose_big::<F>(u.clone(), num_limbs, limb_width);
                         for i in 0..(num_limbs / 3) {
@@ -480,8 +461,6 @@ mod test {
         };
     }
 
-    use crate::UnassignedInteger;
-
     impl_aggregate_with_hash_test_circuit!(
         TestAggregateWithHash2048Circuit,
         test_aggregate_with_hash_2048_circuit,
@@ -494,12 +473,13 @@ mod test {
         ) -> Result<(), Error> {
             let limb_width = Self::LIMB_WIDTH;
             let num_limbs = Self::BITS_LEN / Self::LIMB_WIDTH;
+
             let aggregate_with_hash_chip = self.aggregate_with_hash_chip(config.clone());
             let bigint_chip = aggregate_with_hash_chip.bigint_chip();
             let main_gate_chip = bigint_chip.main_gate();
             let bigint_square_chip = aggregate_with_hash_chip.bigint_square_chip();
 
-            let instances = bigint_chip.main_gate().config().instance;
+            let instances = config.instance;
 
             let (u_out, v_out, y_out, w_out) = layouter.assign_region(
                 || "Pick 2048bit u for partial keys",
@@ -510,7 +490,7 @@ mod test {
                     let mut v_out = vec![];
                     let mut y_out = vec![];
                     let mut w_out = vec![];
-                    for i in 0..MAX_SEQUENCER_NUMBER2 {
+                    for i in 0..MAX_SEQUENCER_NUMBER {
                         let u_limbs = decompose_big::<F>(
                             self.partial_keys[i].u.clone(),
                             num_limbs,
@@ -572,7 +552,7 @@ mod test {
                     // println!("base1 = {:?}", base1);
 
                     let mut hash_out = vec![];
-                    for i in 0..MAX_SEQUENCER_NUMBER2 {
+                    for i in 0..MAX_SEQUENCER_NUMBER {
                         let u = u_out[i].clone();
                         for j in 0..u.num_limbs() / 3 {
                             // println!("limb({:?}) = {:?}", 3 * i, rsa_input.limb(3 * i));
@@ -673,7 +653,7 @@ mod test {
                     let n_square_unassigned = UnassignedInteger::from(n_square_limbs);
 
                     let mut partial_keys_assigned = vec![];
-                    for i in 0..MAX_SEQUENCER_NUMBER2 {
+                    for i in 0..MAX_SEQUENCER_NUMBER {
                         let assigned_extraction_key = AssignedAggregateWithHashExtractionKey::new(
                             u_out[i].clone(),
                             v_out[i].clone(),

@@ -1,21 +1,14 @@
 use ff::{FromUniformBytes, PrimeField};
 
 use halo2wrong::{
-    halo2::{
-        circuit::Value,
-        plonk::Error,
-    },
+    halo2::{circuit::Value, plonk::Error},
     RegionCtx,
 };
 
-use maingate::{
-    AssignedValue, MainGate, MainGateConfig, MainGateInstructions, Term,
-};
+use maingate::{AssignedValue, MainGate, MainGateConfig, MainGateInstructions, Term};
 
-use poseidon::{SparseMDSMatrix, Spec, State};
+use crate::{SparseMDSMatrix, Spec, State};
 // use rand_core::OsRng;
-
-use crate::poseidon;
 
 ///
 #[derive(Debug, Clone)]

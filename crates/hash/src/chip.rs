@@ -1,9 +1,8 @@
 use ff::FromUniformBytes;
-use maingate::{AssignedValue, MainGateConfig, RegionCtx};
-//use halo2::{halo2curves::ff::PrimeField, plonk::Error};
-use crate::poseidon::*;
 use halo2wrong::halo2::halo2curves::ff::PrimeField;
 use halo2wrong::halo2::{circuit::AssignedCell, plonk::Error};
+use maingate::{AssignedValue, MainGateConfig, RegionCtx};
+use poseidon::{PoseidonChip, Spec};
 
 #[derive(Debug, Clone)]
 pub struct HasherChip<
@@ -84,8 +83,6 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use crate::poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
-    use crate::poseidon;
     use ff::FromUniformBytes;
     use halo2wrong::halo2::circuit::AssignedCell;
     use halo2wrong::halo2::circuit::{Layouter, SimpleFloorPlanner, Value};
@@ -94,9 +91,9 @@ mod tests {
     use halo2wrong::halo2::plonk::{Circuit, ConstraintSystem};
     use maingate::mock_prover_verify;
     use maingate::{MainGate, MainGateConfig, MainGateInstructions, RegionCtx};
+    use poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
     use poseidon::Poseidon;
     use poseidon::Spec;
-    use rand_core::OsRng;
 
     use super::HasherChip;
 

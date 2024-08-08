@@ -1,12 +1,12 @@
+use super::AssignedAggregatePartialKeys;
 use crate::{
-    AggregateExtractionKey, AggregatePublicParams, AssignedAggregatePartialKeys,
-    AssignedAggregatePublicParams, AssignedExtractionKey,
+    AggregatePublicParams, AssignedAggregatePublicParams, AssignedExtractionKey,
+    UnassignedExtractionKey,
 };
 use ff::PrimeField;
 use halo2wrong::halo2::plonk::Error;
 use maingate::RegionCtx;
 
-/// Instructions for Aggregate operations.
 pub trait AggregateInstructions<F: PrimeField> {
     /// Assigns a [`AssignedAggregatePublicParams`].
     fn assign_public_params(
@@ -19,7 +19,7 @@ pub trait AggregateInstructions<F: PrimeField> {
     fn assign_extraction_key(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        extraction_key: AggregateExtractionKey<F>,
+        extraction_key: UnassignedExtractionKey<F>,
     ) -> Result<AssignedExtractionKey<F>, Error>;
 
     /// Given a base `x`, a Aggregate public key (e,n), performs the modular power `x^e mod n`.

@@ -1,4 +1,4 @@
-use crate::poseidon::spec::{Spec, State};
+use crate::spec::{Spec, State};
 use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
 
 /// output when desired

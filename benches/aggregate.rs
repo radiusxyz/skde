@@ -16,14 +16,13 @@ use halo2wrong::halo2::{
     transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
     SerdeFormat,
 };
-use skde::{
-    aggregate, AggregateCircuit, DecomposedExtractionKey, ExtractionKey, BITS_LEN,
-    MAX_SEQUENCER_NUMBER,
-};
 
 use num_bigint::{BigUint, RandomBits};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
+use skde::aggregate::{DecomposedExtractionKey, BITS_LEN};
+use skde::delay_encryption::{ExtractionKey, MAX_SEQUENCER_NUMBER};
+use skde::AggregateCircuit;
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufReader, Read, Write},
@@ -108,10 +107,10 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
 
     // set public input
     let combined_partial_limbs: Vec<Fr> =
-        skde::ExtractionKey::decompose_and_combine_all_partial_keys(partial_keys.clone());
+        ExtractionKey::decompose_and_combine_all_partial_keys(partial_keys.clone());
 
     let decomposed_extraction_key: DecomposedExtractionKey<Fr> =
-        skde::ExtractionKey::decompose_extraction_key(&aggregated_key.clone());
+        ExtractionKey::decompose_extraction_key(&aggregated_key.clone());
     let mut combined_limbs = decomposed_extraction_key.combine_limbs();
 
     combined_limbs.extend(combined_partial_limbs);

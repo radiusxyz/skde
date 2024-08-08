@@ -70,8 +70,14 @@ impl<F: Field, T: RangeType> AssignedLimb<F, T> {
 /// Witness integer that is about to be assigned.
 #[derive(Debug, Clone)]
 pub struct UnassignedInteger<F: Field> {
-    pub(crate) value: Value<Vec<F>>,
-    pub(crate) num_limbs: usize,
+    pub value: Value<Vec<F>>,
+    pub num_limbs: usize,
+}
+
+impl<F: Field> UnassignedInteger<F> {
+    pub fn new(value: Value<Vec<F>>, num_limbs: usize) -> Self {
+        Self { value, num_limbs }
+    }
 }
 
 impl<F: Field> From<Vec<F>> for UnassignedInteger<F> {

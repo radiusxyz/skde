@@ -1,96 +1,19 @@
-pub mod chip;
+mod chip;
+mod circuit;
+mod config;
+mod instructions;
+mod key;
+
 pub use chip::*;
-pub mod instructions;
-use halo2wrong::halo2::circuit::Value;
+pub use circuit::*;
+pub use config::*;
 pub use instructions::*;
+pub use key::*;
 
-use ff::{Field, PrimeField};
-
-use crate::{big_integer::*, MAX_SEQUENCER_NUMBER};
-
-pub const BITS_LEN: usize = 2048; // n's bit length
-pub const LIMB_WIDTH: usize = 64;
-pub const LIMB_COUNT: usize = BITS_LEN / LIMB_WIDTH;
-
-/// Aggregate extraction key that is about to be assigned.
-#[derive(Clone, Debug)]
-pub struct AggregateExtractionKey<F: Field> {
-    pub u: UnassignedInteger<F>,
-    pub v: UnassignedInteger<F>,
-    pub y: UnassignedInteger<F>,
-    pub w: UnassignedInteger<F>,
-}
-
-impl<F: PrimeField> AggregateExtractionKey<F> {
-    /// Creates new [`AggregateExtractionKey`] from `u, v, y, w`.
-    ///
-    /// # Arguments
-    /// * u - a parameter `u`.
-    /// * v - a parameter `v`.
-    /// * y - a parameter `y`.
-    /// * w - a parameter `w`.
-    ///
-    /// # Return values
-    /// Returns new [`AggregateExtractionKey`].
-    pub fn new(
-        u: UnassignedInteger<F>,
-        v: UnassignedInteger<F>,
-        y: UnassignedInteger<F>,
-        w: UnassignedInteger<F>,
-    ) -> Self {
-        Self { u, v, y, w }
-    }
-
-    pub fn without_witness(num_limbs: usize) -> Self {
-        let u = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        let v = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        let y = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        let w = UnassignedInteger {
-            value: Value::unknown(),
-            num_limbs,
-        };
-        Self { u, v, y, w }
-    }
-}
-
-/// An assigned Aggregate extraction key.
-#[derive(Clone, Debug)]
-pub struct AssignedExtractionKey<F: PrimeField> {
-    pub u: AssignedInteger<F, Fresh>,
-    pub v: AssignedInteger<F, Fresh>,
-    pub y: AssignedInteger<F, Fresh>,
-    pub w: AssignedInteger<F, Fresh>,
-}
-
-impl<F: PrimeField> AssignedExtractionKey<F> {
-    /// Creates new [`AssignedExtractionKey`] from assigned `u,v,y,w`.
-    ///
-    /// # Arguments
-    /// * u - an assigned parameter `u`.
-    /// * v - an assigned parameter `v`.
-    /// * y - an assigned parameter `y`.
-    /// * w - an assigned parameter `uw`.
-    ///
-    /// # Return values
-    /// Returns new [`AssignedExtractionKey`].
-    pub fn new(
-        u: AssignedInteger<F, Fresh>,
-        v: AssignedInteger<F, Fresh>,
-        y: AssignedInteger<F, Fresh>,
-        w: AssignedInteger<F, Fresh>,
-    ) -> Self {
-        Self { u, v, y, w }
-    }
-}
+use crate::MAX_SEQUENCER_NUMBER;
+use big_integer::*;
+use ff::PrimeField;
+use halo2wrong::halo2::circuit::Value;
 
 /// Aggregate public key that is about to be assigned.
 #[derive(Clone, Debug)]
@@ -144,52 +67,5 @@ impl<F: PrimeField> AssignedAggregatePublicParams<F> {
     /// Returns new [`AssignedAggregatePublicParams`].
     pub fn new(n: AssignedInteger<F, Fresh>, n_square: AssignedInteger<F, Fresh>) -> Self {
         Self { n, n_square }
-    }
-}
-
-/// Aggregate public key that is about to be assigned.
-#[derive(Clone, Debug)]
-pub struct AggregatePartialKeys<F: PrimeField> {
-    /// a modulus parameter
-    pub partial_keys: Vec<AggregateExtractionKey<F>>,
-}
-
-impl<F: PrimeField> AggregatePartialKeys<F> {
-    /// Creates new [`AggregatePartialKeys`] from `n`.
-    ///
-    /// # Arguments
-    /// * partial_keys - a vector of `extraction keys`.
-    ///
-    /// # Return values
-    /// Returns new [`AggregatePartialKeys`].
-    pub fn new(partial_keys: Vec<AggregateExtractionKey<F>>) -> Self {
-        Self { partial_keys }
-    }
-
-    pub fn without_witness(num_limbs: usize) -> Self {
-        let mut partial_keys = vec![];
-        for _ in 0..MAX_SEQUENCER_NUMBER {
-            partial_keys.push(AggregateExtractionKey::without_witness(num_limbs));
-        }
-        Self { partial_keys }
-    }
-}
-
-/// An assigned Aggregate public key.
-#[derive(Clone, Debug)]
-pub struct AssignedAggregatePartialKeys<F: PrimeField> {
-    pub partial_keys: Vec<AssignedExtractionKey<F>>,
-}
-
-impl<F: PrimeField> AssignedAggregatePartialKeys<F> {
-    /// Creates new [`AssignedAggregatePartialKeys`] from assigned `n`.
-    ///
-    /// # Arguments
-    /// * partial_keys - an assigned vector of `extraction keys`.
-    ///
-    /// # Return values
-    /// Returns new [`AssignedAggregatePartialKeys`].
-    pub fn new(partial_keys: Vec<AssignedExtractionKey<F>>) -> Self {
-        Self { partial_keys }
     }
 }

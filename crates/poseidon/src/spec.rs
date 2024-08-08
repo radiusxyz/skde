@@ -1,4 +1,4 @@
-use crate::poseidon::{grain::Grain, matrix::Matrix};
+use crate::{grain::Grain, matrix::Matrix};
 use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
 use std::ops::Index;
 
@@ -404,7 +404,7 @@ pub(super) mod tests {
     use halo2wrong::halo2::halo2curves::serde::SerdeObject;
 
     use super::MDSMatrix;
-    use crate::poseidon::grain::Grain;
+    use crate::grain::Grain;
 
     /// We want to keep non-optimized parameters to cross test with optimized
     /// one

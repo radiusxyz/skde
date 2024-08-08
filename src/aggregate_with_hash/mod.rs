@@ -1,14 +1,17 @@
-pub mod chip;
+mod chip;
+mod circuit;
+mod instructions;
+
 pub use chip::*;
-pub mod instructions;
-use halo2wrong::halo2::circuit::Value;
+pub use circuit::*;
 pub use instructions::*;
 
+use big_integer::UnassignedInteger;
+use big_integer::*;
 use ff::PrimeField;
+use halo2wrong::halo2::circuit::Value;
 
-use crate::big_integer::*;
-
-pub const MAX_SEQUENCER_NUMBER2: usize = 20;
+use crate::MAX_SEQUENCER_NUMBER;
 
 /// AggregateWithHash extraction key that is about to be assigned.
 #[derive(Clone, Debug)]
@@ -168,7 +171,7 @@ impl<F: PrimeField> AggregateWithHashPartialKeys<F> {
 
     pub fn without_witness(num_limbs: usize) -> Self {
         let mut partial_keys = vec![];
-        for _ in 0..MAX_SEQUENCER_NUMBER2 {
+        for _ in 0..MAX_SEQUENCER_NUMBER {
             partial_keys.push(AggregateWithHashExtractionKey::without_witness(num_limbs));
         }
         Self { partial_keys }

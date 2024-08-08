@@ -1,118 +1,14 @@
-use crate::big_integer::{BigIntChip, BigIntConfig, BigIntInstructions};
+use super::{AggregateConfig, MAX_SEQUENCER_NUMBER};
 use crate::{
-    AggregateExtractionKey, AggregateInstructions, AggregatePublicParams,
-    AssignedAggregatePartialKeys, AssignedAggregatePublicParams, AssignedExtractionKey,
-    ExtractionKey, UnassignedInteger, LIMB_COUNT, LIMB_WIDTH,
+    AggregateInstructions, AggregatePublicParams, AssignedAggregatePartialKeys,
+    AssignedAggregatePublicParams, AssignedExtractionKey, UnassignedExtractionKey,
 };
-use halo2wrong::halo2::plonk::Error;
-use maingate::{decompose_big, MainGate, RangeChip, RegionCtx};
-
+use big_integer::{BigIntChip, BigIntInstructions};
 use ff::PrimeField;
-// use num_bigint::BigUint;
-
-use super::MAX_SEQUENCER_NUMBER;
+use halo2wrong::halo2::plonk::Error;
+use maingate::{MainGate, RangeChip, RegionCtx};
 use std::marker::PhantomData;
 
-#[derive(Clone, Debug)]
-pub struct DecomposedExtractionKey<F: PrimeField> {
-    pub u_limbs: Vec<F>,
-    pub v_limbs: Vec<F>,
-    pub y_limbs: Vec<F>,
-    pub w_limbs: Vec<F>,
-}
-
-impl<F: PrimeField> DecomposedExtractionKey<F> {
-    pub fn combine_limbs(self) -> Vec<F> {
-        let mut combined = Vec::new();
-
-        combined.extend(self.u_limbs);
-        combined.extend(self.v_limbs);
-        combined.extend(self.y_limbs);
-        combined.extend(self.w_limbs);
-
-        combined
-    }
-
-    pub fn to_unassigned_integers(
-        self,
-    ) -> (
-        UnassignedInteger<F>,
-        UnassignedInteger<F>,
-        UnassignedInteger<F>,
-        UnassignedInteger<F>,
-    ) {
-        let u_unassigned = UnassignedInteger::from(self.u_limbs);
-        let v_unassigned = UnassignedInteger::from(self.v_limbs);
-        let y_unassigned = UnassignedInteger::from(self.y_limbs);
-        let w_unassigned = UnassignedInteger::from(self.w_limbs);
-
-        (u_unassigned, v_unassigned, y_unassigned, w_unassigned)
-    }
-}
-
-impl ExtractionKey {
-    pub fn decompose_extraction_key<F: PrimeField>(
-        extraction_keys: &ExtractionKey,
-    ) -> DecomposedExtractionKey<F> {
-        let num_limbs = LIMB_COUNT;
-        let limb_width = LIMB_WIDTH;
-
-        let decomposed_u = decompose_big::<F>(extraction_keys.u.clone(), num_limbs, limb_width);
-
-        let decomposed_v = decompose_big::<F>(extraction_keys.v.clone(), num_limbs * 2, limb_width);
-
-        let decomposed_y = decompose_big::<F>(extraction_keys.y.clone(), num_limbs, limb_width);
-
-        let decomposed_w = decompose_big::<F>(extraction_keys.w.clone(), num_limbs * 2, limb_width);
-        DecomposedExtractionKey {
-            u_limbs: decomposed_u,
-            v_limbs: decomposed_v,
-            y_limbs: decomposed_y,
-            w_limbs: decomposed_w,
-        }
-    }
-
-    pub fn decompose_and_combine_all_partial_keys<F: PrimeField>(
-        extraction_keys: Vec<ExtractionKey>,
-    ) -> Vec<F> {
-        let mut combined_partial = Vec::new();
-
-        for key in extraction_keys {
-            let decomposed_key = Self::decompose_extraction_key::<F>(&key);
-            let combined_parital_limbs = decomposed_key.combine_limbs();
-            combined_partial.extend(combined_parital_limbs)
-        }
-
-        combined_partial
-    }
-}
-
-/// Configuration for [`BigIntChip`].
-#[derive(Clone, Debug)]
-pub struct AggregateConfig {
-    /// Configuration for [`BigIntChip`].
-    pub bigint_config: BigIntConfig,
-    pub bigint_square_config: BigIntConfig,
-    // instance: Column<Instance>,
-}
-
-impl AggregateConfig {
-    /// Creates new [`AggregateConfig`] from [`BigIntConfig`].
-    ///
-    /// # Arguments
-    /// * bigint_config - a configuration for [`BigIntChip`].
-    ///
-    /// # Return values
-    /// Returns new [`AggregateConfig`].
-    pub fn new(bigint_config: BigIntConfig, bigint_square_config: BigIntConfig) -> Self {
-        Self {
-            bigint_config,
-            bigint_square_config,
-        }
-    }
-}
-
-/// Chip for [`AggregateInstructions`].
 #[derive(Debug, Clone)]
 pub struct AggregateChip<F: PrimeField> {
     config: AggregateConfig,
@@ -132,7 +28,7 @@ impl<F: PrimeField> AggregateInstructions<F> for AggregateChip<F> {
     fn assign_extraction_key(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        extraction_key: AggregateExtractionKey<F>,
+        extraction_key: UnassignedExtractionKey<F>,
     ) -> Result<AssignedExtractionKey<F>, Error> {
         let bigint_chip = self.bigint_chip();
         let bigint_square_chip: BigIntChip<F> = self.bigint_square_chip();
@@ -296,7 +192,11 @@ impl<F: PrimeField> AggregateChip<F> {
 #[cfg(test)]
 mod test {
 
-    use crate::{aggregate, ExtractionKey, UnassignedInteger, BITS_LEN};
+    use crate::{
+        aggregate, apply_aggregate_key_instance_constraints,
+        apply_partial_key_instance_constraints, BigIntConfig, DecomposedExtractionKey,
+        ExtractionKey, UnassignedInteger, BITS_LEN, LIMB_WIDTH,
+    };
 
     use super::*;
     use ff::FromUniformBytes;
@@ -321,73 +221,6 @@ mod test {
         fn aggregate_chip(&self, config: AggregateConfig) -> AggregateChip<F> {
             AggregateChip::new(config, BITS_LEN)
         }
-    }
-
-    pub fn apply_aggregate_key_instance_constraints<F: PrimeField>(
-        layouter: &mut impl halo2wrong::halo2::circuit::Layouter<F>,
-        valid_agg_key_result: &AssignedExtractionKey<F>,
-        num_limbs: usize,
-        instances: Column<Instance>,
-    ) -> Result<(), Error> {
-        // let u_index = 0_usize;
-        let y_index = num_limbs * 3;
-        let v_index = num_limbs;
-        let w_index = num_limbs * 4;
-
-        (0..num_limbs).try_for_each(|i| -> Result<(), Error> {
-            layouter.constrain_instance(valid_agg_key_result.u.limb(i).cell(), instances, i)?;
-            layouter.constrain_instance(
-                valid_agg_key_result.y.limb(i).cell(),
-                instances,
-                y_index + i,
-            )
-        })?;
-
-        (0..num_limbs * 2).try_for_each(|i| -> Result<(), Error> {
-            layouter.constrain_instance(
-                valid_agg_key_result.v.limb(i).cell(),
-                instances,
-                v_index + i,
-            )?;
-            layouter.constrain_instance(
-                valid_agg_key_result.w.limb(i).cell(),
-                instances,
-                w_index + i,
-            )
-        })?;
-        Ok(())
-    }
-
-    fn apply_partial_key_instance_constraints<F: PrimeField>(
-        layouter: &mut impl halo2wrong::halo2::circuit::Layouter<F>,
-        partial_key_result: &AssignedAggregatePartialKeys<F>,
-        num_limbs: usize,
-        instances: Column<Instance>,
-    ) -> Result<(), Error> {
-        (0..MAX_SEQUENCER_NUMBER).try_for_each(|k| -> Result<(), Error> {
-            let u_limb = &partial_key_result.partial_keys[k].u;
-            let v_limb = &partial_key_result.partial_keys[k].v;
-            let y_limb = &partial_key_result.partial_keys[k].y;
-            let w_limb = &partial_key_result.partial_keys[k].w;
-
-            let base_index = k * 6 * num_limbs;
-            let u_index = base_index + num_limbs * 6;
-            let v_index = base_index + num_limbs * 7;
-            let y_index = base_index + num_limbs * 9;
-            let w_index = base_index + num_limbs * 10;
-
-            (0..num_limbs).try_for_each(|i| -> Result<(), Error> {
-                layouter.constrain_instance(u_limb.limb(i).cell(), instances, u_index + i)?;
-                layouter.constrain_instance(y_limb.limb(i).cell(), instances, y_index + i)
-            })?;
-
-            (0..num_limbs * 2).try_for_each(|i| -> Result<(), Error> {
-                layouter.constrain_instance(v_limb.limb(i).cell(), instances, v_index + i)?;
-                layouter.constrain_instance(w_limb.limb(i).cell(), instances, w_index + i)
-            })?;
-
-            Ok(())
-        })
     }
 
     impl<F: PrimeField> Circuit<F> for TestAggregateKeyCircuit<F> {
@@ -423,6 +256,7 @@ mod test {
             Self::Config {
                 bigint_config,
                 bigint_square_config,
+                instance: meta.instance_column(),
             }
         }
 
@@ -431,6 +265,7 @@ mod test {
             config: Self::Config,
             mut layouter: impl halo2wrong::halo2::circuit::Layouter<F>,
         ) -> Result<(), Error> {
+            let instances = config.instance.clone();
             let aggregate_chip = self.aggregate_chip(config);
             let bigint_chip = aggregate_chip.bigint_chip();
             let bigint_square_chip = aggregate_chip.bigint_square_chip();
@@ -452,24 +287,24 @@ mod test {
                     let mut partial_keys_assigned = vec![];
                     for i in 0..MAX_SEQUENCER_NUMBER {
                         let decomposed_partial_key =
-                            aggregate::chip::ExtractionKey::decompose_extraction_key(
-                                &self.partial_keys[i],
-                            );
+                            ExtractionKey::decompose_extraction_key(&self.partial_keys[i]);
 
                         let (u_unassigned, v_unassigned, y_unassigned, w_unassigned) =
                             decomposed_partial_key.to_unassigned_integers();
 
-                        let extraction_key_unassgined = AggregateExtractionKey::new(
-                            u_unassigned,
-                            v_unassigned,
-                            y_unassigned,
-                            w_unassigned,
-                        );
+                        let extraction_key_unassgined = UnassignedExtractionKey {
+                            u: u_unassigned,
+                            v: v_unassigned,
+                            y: y_unassigned,
+                            w: w_unassigned,
+                        };
                         partial_keys_assigned.push(
                             aggregate_chip.assign_extraction_key(ctx, extraction_key_unassgined)?,
                         );
                     }
-                    let partial_keys = AssignedAggregatePartialKeys::new(partial_keys_assigned);
+                    let partial_keys = AssignedAggregatePartialKeys {
+                        partial_keys: partial_keys_assigned,
+                    };
 
                     let public_params_unassigned = AggregatePublicParams::new(
                         n_unassigned.clone(),
@@ -486,8 +321,6 @@ mod test {
                     Ok((partial_keys, valid_agg_key))
                 },
             )?;
-
-            let instances = bigint_chip.main_gate().config().instance;
 
             apply_aggregate_key_instance_constraints(
                 &mut layouter,
@@ -552,12 +385,10 @@ mod test {
             }
 
             let combined_partial_limbs: Vec<F> =
-                aggregate::chip::ExtractionKey::decompose_and_combine_all_partial_keys(
-                    partial_keys.clone(),
-                );
+                ExtractionKey::decompose_and_combine_all_partial_keys(partial_keys.clone());
 
             let decomposed_extraction_key: DecomposedExtractionKey<F> =
-                aggregate::chip::ExtractionKey::decompose_extraction_key(&aggregated_key);
+                ExtractionKey::decompose_extraction_key(&aggregated_key);
             let mut combined_limbs = decomposed_extraction_key.combine_limbs();
 
             let circuit = TestAggregateKeyCircuit::<F> {

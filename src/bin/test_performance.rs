@@ -1,5 +1,9 @@
 use std::time::Instant;
 
+use delay_encryption::{
+    aggregate_key_pairs, decrypt, encrypt, key_generation_with_proof, setup,
+    solve_time_lock_puzzle, verify_key_validity, PublicKey,
+};
 use skde::*;
 
 fn main() {

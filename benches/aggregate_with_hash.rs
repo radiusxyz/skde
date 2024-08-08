@@ -17,14 +17,13 @@ use halo2wrong::halo2::{
     SerdeFormat,
 };
 use maingate::{big_to_fe, decompose_big};
-use skde::{
-    aggregate_with_hash, AggregateWithHashCircuit, DecomposedExtractionKey, ExtractionKey,
-    ExtractionKey2, Poseidon, Spec, BITS_LEN, MAX_SEQUENCER_NUMBER, MAX_SEQUENCER_NUMBER2,
-};
 
 use num_bigint::{BigUint, RandomBits};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
+use skde::aggregate_with_hash::{ExtractionKey2, MAX_SEQUENCER_NUMBER2};
+use skde::poseidon::{Poseidon, Spec};
+use skde::AggregateWithHashCircuit;
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufReader, Read, Write},
@@ -56,11 +55,6 @@ fn write_to_file<P: AsRef<Path>>(path: P, data: &[u8]) {
 }
 
 fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
-
-    use skde::{
-        aggregate_with_hash, AggregateWithHashCircuit, DecomposedExtractionKey, ExtractionKey,
-        ExtractionKey2, Poseidon, Spec, BITS_LEN, MAX_SEQUENCER_NUMBER, MAX_SEQUENCER_NUMBER2,
-    };
     // define prover and verifier names
     let prover_name = "Measure prover time in ".to_owned() + name;
     let verifier_name = "Measure verifier time in ".to_owned() + name;
