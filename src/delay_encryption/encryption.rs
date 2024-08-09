@@ -10,11 +10,11 @@ use std::{
 
 pub fn encrypt(
     skde_params: &SkdeParams,
-    plain_text: &str,
+    message: &str,
     encryption_key: &PublicKey,
 ) -> io::Result<CipherPair> {
     // TODO: Arbitrary Length of Message
-    let plain_text = BigUint::from_str(plain_text).expect("Invalid message");
+    let plain_text = BigUint::from_str(message).expect("Invalid message");
 
     if plain_text >= skde_params.n {
         return Err(io::Error::new(
