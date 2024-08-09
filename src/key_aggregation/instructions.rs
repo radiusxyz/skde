@@ -6,9 +6,7 @@ use ff::PrimeField;
 use halo2wrong::halo2::plonk::Error;
 use maingate::RegionCtx;
 
-use super::AssignedExtractionKey;
-
-pub trait AggregateInstructions<F: PrimeField> {
+pub trait KeyAggregationInstructions<F: PrimeField> {
     fn assign_public_params(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -19,12 +17,5 @@ pub trait AggregateInstructions<F: PrimeField> {
         &self,
         ctx: &mut RegionCtx<'_, F>,
         unassigned_partial_key: UnassignedPartialKey<F>,
-    ) -> Result<AssignedPartialKey<F>, Error>;
-
-    fn aggregate_key(
-        &self,
-        ctx: &mut RegionCtx<'_, F>,
-        assigned_extraction_key: &AssignedExtractionKey<F>,
-        public_params: &AssignedKeyAggregationPublicParams<F>,
     ) -> Result<AssignedPartialKey<F>, Error>;
 }

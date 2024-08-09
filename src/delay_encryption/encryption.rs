@@ -1,5 +1,5 @@
 use super::{CipherPair, PublicKey, SecretKey};
-use crate::SingleKeyDelayEncryptionParam;
+use crate::SkdeParams;
 use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod};
 use num_bigint::{BigUint, RandBigInt};
 use rand::thread_rng;
@@ -9,7 +9,7 @@ use std::{
 };
 
 pub fn encrypt(
-    skde_params: &SingleKeyDelayEncryptionParam,
+    skde_params: &SkdeParams,
     plain_text: &str,
     encryption_key: &PublicKey,
 ) -> io::Result<CipherPair> {
@@ -38,7 +38,7 @@ pub fn encrypt(
 }
 
 pub fn decrypt(
-    skde_params: &SingleKeyDelayEncryptionParam,
+    skde_params: &SkdeParams,
     cipher_text: &CipherPair,
     decryption_key: &SecretKey,
 ) -> io::Result<String> {

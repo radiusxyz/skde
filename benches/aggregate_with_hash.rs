@@ -19,10 +19,11 @@ use halo2wrong::halo2::{
 use maingate::{big_to_fe, decompose_big};
 
 use num_bigint::{BigUint, RandomBits};
+use num_traits::One;
 use poseidon::{Poseidon, Spec};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
-use skde::key_aggregation::AggregateHashCircuit;
+use skde::key_aggregation::{AggregateHashCircuit, AggregatedKey};
 use skde::key_generation::PartialKey;
 use skde::MAX_SEQUENCER_NUMBER;
 
@@ -73,10 +74,16 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         ParamsKZG::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
 
     let mut rng = thread_rng();
-    let bits_len = AggregateHashCircuit::<Fr, 5, 4>::BITS_LEN as u64;
+
+    let bit_len = AggregateHashCircuit::<Fr, 5, 4>::BIT_LEN as u64;
+    let limb_width = AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
+    let limb_count = AggregateHashCircuit::<Fr, 5, 4>::LIMB_COUNT;
+
+    let max_sequencer_number = MAX_SEQUENCER_NUMBER;
+
     let mut n = BigUint::default();
-    while n.bits() != bits_len {
-        n = rng.sample(RandomBits::new(bits_len));
+    while n.bits() != bit_len {
+        n = rng.sample(RandomBits::new(bit_len));
     }
     let n_square = &n * &n;
 
@@ -84,18 +91,18 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
 
     let mut partial_key_list = vec![];
 
-    let mut aggregated_key = PartialKey {
-        u: BigUint::from(1usize),
-        v: BigUint::from(1usize),
-        y: BigUint::from(1usize),
-        w: BigUint::from(1usize),
+    let mut aggregated_key = AggregatedKey {
+        u: BigUint::one(),
+        v: BigUint::one(),
+        y: BigUint::one(),
+        w: BigUint::one(),
     };
 
-    for _ in 0..MAX_SEQUENCER_NUMBER {
-        let u = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
-        let v = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
-        let y = rng.sample::<BigUint, _>(RandomBits::new(bits_len)) % &n;
-        let w = rng.sample::<BigUint, _>(RandomBits::new(bits_len * 2)) % &n_square;
+    for _ in 0..max_sequencer_number {
+        let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
+        let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
+        let y = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
+        let w = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
 
         partial_key_list.push(PartialKey {
             u: u.clone(),
@@ -120,16 +127,13 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
     ));
     let base2: Fr = base1 * &base1;
 
-    let mut hashes = vec![];
-
-    let limb_width = AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
-    let num_limbs =
-        AggregateHashCircuit::<Fr, 5, 4>::BITS_LEN / AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
+    let mut hash_list = vec![];
 
     for i in 0..MAX_SEQUENCER_NUMBER {
         let u = partial_key_list[i].u.clone();
-        let u_limbs = decompose_big::<Fr>(u.clone(), num_limbs, limb_width);
-        for i in 0..(num_limbs / 3) {
+        let u_limbs = decompose_big::<Fr>(u.clone(), limb_count, limb_width);
+
+        for i in 0..(limb_count / 3) {
             let mut u_compose = u_limbs[3 * i];
             u_compose += base1 * &u_limbs[3 * i + 1];
             u_compose += base2 * &u_limbs[3 * i + 2];
@@ -137,13 +141,12 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         }
         let mut u_compose = u_limbs[30];
         u_compose += base1 * &u_limbs[31];
-
         let e = u_compose;
         ref_hasher.update(&[e.clone()]);
 
         let v = partial_key_list[i].v.clone();
-        let v_limbs = decompose_big::<Fr>(v.clone(), num_limbs * 2, limb_width);
-        for i in 0..(num_limbs * 2 / 3) {
+        let v_limbs = decompose_big::<Fr>(v.clone(), limb_count * 2, limb_width);
+        for i in 0..(limb_count * 2 / 3) {
             let mut v_compose = v_limbs[3 * i];
             v_compose += base1 * &v_limbs[3 * i + 1];
             v_compose += base2 * &v_limbs[3 * i + 2];
@@ -155,8 +158,8 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         ref_hasher.update(&[e.clone()]);
 
         let y = partial_key_list[i].y.clone();
-        let y_limbs = decompose_big::<Fr>(y.clone(), num_limbs, limb_width);
-        for i in 0..(num_limbs / 3) {
+        let y_limbs = decompose_big::<Fr>(y.clone(), limb_count, limb_width);
+        for i in 0..(limb_count / 3) {
             let mut y_compose = y_limbs[3 * i];
             y_compose += base1 * &y_limbs[3 * i + 1];
             y_compose += base2 * &y_limbs[3 * i + 2];
@@ -168,8 +171,8 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         ref_hasher.update(&[e.clone()]);
 
         let w = partial_key_list[i].w.clone();
-        let w_limbs = decompose_big::<Fr>(w.clone(), num_limbs * 2, limb_width);
-        for i in 0..(num_limbs * 2 / 3) {
+        let w_limbs = decompose_big::<Fr>(w.clone(), limb_count * 2, limb_width);
+        for i in 0..(limb_count * 2 / 3) {
             let mut w_compose = w_limbs[3 * i];
             w_compose += base1 * &w_limbs[3 * i + 1];
             w_compose += base2 * &w_limbs[3 * i + 2];
@@ -179,38 +182,40 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         w_compose += base1 * &w_limbs[31];
         let e = w_compose;
         ref_hasher.update(&[e.clone()]);
+
         let hash = ref_hasher.squeeze(1);
-        hashes.push(hash[1]);
-        hashes.push(hash[2]);
+        hash_list.push(hash[1]);
+        hash_list.push(hash[2]);
     }
 
     let circuit = AggregateHashCircuit::<Fr, 5, 4> {
-        partial_key_list,
-        n,
         spec,
+        n,
         n_square,
+        partial_key_list,
+        max_sequencer_number,
         _f: PhantomData,
     };
 
-    let mut public_inputs = vec![hashes];
+    let mut public_inputs = vec![hash_list];
     public_inputs[0].extend(decompose_big::<Fr>(
         aggregated_key.u.clone(),
-        num_limbs,
+        limb_count,
         limb_width,
     ));
     public_inputs[0].extend(decompose_big::<Fr>(
         aggregated_key.v.clone(),
-        num_limbs * 2,
+        limb_count * 2,
         limb_width,
     ));
     public_inputs[0].extend(decompose_big::<Fr>(
         aggregated_key.y.clone(),
-        num_limbs,
+        limb_count,
         limb_width,
     ));
     public_inputs[0].extend(decompose_big::<Fr>(
         aggregated_key.w.clone(),
-        num_limbs * 2,
+        limb_count * 2,
         limb_width,
     ));
 

@@ -1,15 +1,18 @@
 mod partial_key_validity;
 mod types;
 
-use big_integer::big_pow_mod;
-use num_bigint::BigUint;
-use num_traits::One;
 pub use partial_key_validity::*;
 pub use types::*;
 
-use crate::{util::generate_random_biguint, SingleKeyDelayEncryptionParam};
+use crate::SkdeParams;
+use big_integer::{big_pow_mod, generate_random_biguint, BigIntChip, BigIntInstructions};
+use ff::PrimeField;
+use halo2wrong::halo2::plonk::Error;
+use maingate::RegionCtx;
+use num_bigint::BigUint;
+use num_traits::One;
 
-pub fn generate_key(skde_params: SingleKeyDelayEncryptionParam) -> (SecretValue, PartialKey) {
+pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKey) {
     let two_big: BigUint = BigUint::from(2u32);
 
     let n_half: BigUint = &skde_params.n / two_big;
@@ -19,8 +22,8 @@ pub fn generate_key(skde_params: SingleKeyDelayEncryptionParam) -> (SecretValue,
     let s = generate_random_biguint(n_half_over_m.bits());
     let k = generate_random_biguint(n_half.bits());
 
-    let uv_pair = generate_uv_pair(&(&r + &s), &s, &skde_params);
-    let yw_pair = generate_uv_pair(&k, &r, &skde_params);
+    let uv_pair = generate_uv_pair(skde_params, &(&r + &s), &s);
+    let yw_pair = generate_uv_pair(skde_params, &k, &r);
 
     (
         SecretValue { r, s, k },
@@ -35,11 +38,7 @@ pub fn generate_key(skde_params: SingleKeyDelayEncryptionParam) -> (SecretValue,
 
 // Input: (a, b, skde_params = (n, g, t, h))
 // Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
-pub fn generate_uv_pair(
-    a: &BigUint,
-    b: &BigUint,
-    skde_params: &SingleKeyDelayEncryptionParam,
-) -> UVPair {
+pub fn generate_uv_pair(skde_params: &SkdeParams, a: &BigUint, b: &BigUint) -> UVPair {
     let n = &skde_params.n;
     let g = &skde_params.g;
     let h = &skde_params.h;
@@ -59,4 +58,18 @@ pub fn generate_uv_pair(
     let v = (&big_pow_mod(&n_plus_one, b, &n_square) * &h_exp_an) % &n_square;
 
     UVPair { u, v }
+}
+
+pub fn assign_partial_key<F: PrimeField>(
+    ctx: &mut RegionCtx<'_, F>,
+    bigint_chip: BigIntChip<F>,
+    bigint_square_chip: BigIntChip<F>,
+    unassigned_partial_key: UnassignedPartialKey<F>,
+) -> Result<AssignedPartialKey<F>, Error> {
+    Ok(AssignedPartialKey::new(
+        bigint_chip.assign_integer(ctx, unassigned_partial_key.u)?,
+        bigint_square_chip.assign_integer(ctx, unassigned_partial_key.v)?,
+        bigint_chip.assign_integer(ctx, unassigned_partial_key.y)?,
+        bigint_square_chip.assign_integer(ctx, unassigned_partial_key.w)?,
+    ))
 }

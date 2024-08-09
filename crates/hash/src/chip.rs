@@ -14,7 +14,7 @@ pub struct HasherChip<
     const R_F: usize,
     const R_P: usize,
 > {
-    pub pose_chip: PoseidonChip<F, T, RATE, R_F, R_P>,
+    pub poseidon_chip: PoseidonChip<F, T, RATE, R_F, R_P>,
 }
 
 impl<
@@ -34,18 +34,18 @@ impl<
         spec: &Spec<F, T, RATE>,
         main_gate_config: &MainGateConfig,
     ) -> Result<Self, Error> {
-        let pos_hash_chip =
+        let poseidon_hash_chip =
             PoseidonChip::<F, T, RATE, R_F, R_P>::new_hash(ctx, spec, main_gate_config)?;
 
         Ok(Self {
-            pose_chip: pos_hash_chip,
+            poseidon_chip: poseidon_hash_chip,
         })
     }
 
     /// Appends field elements to the absorbation line. It won't perform
     /// permutation here
     pub fn update(&mut self, elements: &[AssignedValue<F>]) {
-        self.pose_chip.absorbing.extend_from_slice(elements);
+        self.poseidon_chip.absorbing.extend_from_slice(elements);
     }
 }
 
@@ -61,23 +61,23 @@ impl<
 {
     pub fn hash(&mut self, ctx: &mut RegionCtx<'_, F>) -> Result<[AssignedCell<F, F>; T], Error> {
         // Get elements to be hashed
-        let input_elements = self.pose_chip.absorbing.clone();
+        let input_elements = self.poseidon_chip.absorbing.clone();
         // Flush the input que
-        self.pose_chip.absorbing.clear();
+        self.poseidon_chip.absorbing.clear();
 
         let mut padding_offset = 0;
         // Apply permutation to `RATE`Ï sized chunks
         for chunk in input_elements.chunks(RATE) {
             padding_offset = RATE - chunk.len();
-            self.pose_chip.perm_hash(ctx, chunk.to_vec())?;
+            self.poseidon_chip.perm_hash(ctx, chunk.to_vec())?;
         }
 
         // If last chunking is full apply another permutation for collution resistance
         if padding_offset == 0 {
-            self.pose_chip.perm_hash(ctx, vec![])?;
+            self.poseidon_chip.perm_hash(ctx, vec![])?;
         }
 
-        Ok(self.pose_chip.state.0.clone())
+        Ok(self.poseidon_chip.state.0.clone())
     }
 }
 

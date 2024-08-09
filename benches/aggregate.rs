@@ -18,10 +18,11 @@ use halo2wrong::halo2::{
 };
 
 use num_bigint::{BigUint, RandomBits};
+use num_traits::One;
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
-use skde::key_aggregation::AggregateRawCircuit;
-use skde::key_generation::{DecomposedPartialKey, PartialKey};
+use skde::key_aggregation::{AggregateRawCircuit, AggregatedKey, DecomposedAggregatedKey};
+use skde::key_generation::PartialKey;
 use skde::MAX_SEQUENCER_NUMBER;
 use std::{
     fs::{self, File, OpenOptions},
@@ -70,10 +71,12 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
         ParamsKZG::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
 
     let mut rng = thread_rng();
-    let bits_len = AggregateRawCircuit::<Fr>::BITS_LEN as u64;
 
+    let bits_len = AggregateRawCircuit::<Fr>::BIT_LEN as u64;
     let limb_width = AggregateRawCircuit::<Fr>::LIMB_WIDTH;
-    let limb_count = AggregateRawCircuit::<Fr>::BITS_LEN / AggregateRawCircuit::<Fr>::LIMB_WIDTH;
+    let limb_count = AggregateRawCircuit::<Fr>::LIMB_COUNT;
+
+    let max_sequencer_count = MAX_SEQUENCER_NUMBER;
 
     let mut n = BigUint::default();
     while n.bits() != bits_len {
@@ -83,11 +86,11 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
 
     let mut partial_key_list = vec![];
 
-    let mut aggregated_key = PartialKey {
-        u: BigUint::from(1usize),
-        v: BigUint::from(1usize),
-        y: BigUint::from(1usize),
-        w: BigUint::from(1usize),
+    let mut aggregated_key = AggregatedKey {
+        u: BigUint::one(),
+        v: BigUint::one(),
+        y: BigUint::one(),
+        w: BigUint::one(),
     };
 
     for _ in 0..MAX_SEQUENCER_NUMBER {
@@ -116,19 +119,20 @@ fn bench_aggregate<const K: u32>(name: &str, c: &mut Criterion) {
         limb_count,
     );
 
-    let decomposed_partial_key: DecomposedPartialKey<Fr> =
-        PartialKey::decompose_partial_key(&aggregated_key.clone(), limb_width, limb_count);
-    let mut combined_limbs = decomposed_partial_key.combine_limbs();
+    let decomposed_aggregated_key: DecomposedAggregatedKey<Fr> =
+        AggregatedKey::decompose_partial_key(&aggregated_key.clone(), limb_width, limb_count);
+    let mut combined_limbs = decomposed_aggregated_key.combine_limbs();
 
     combined_limbs.extend(combined_partial_limbs);
 
     let public_inputs = [combined_limbs.as_slice()];
 
     let circuit = AggregateRawCircuit::<Fr> {
-        partial_key_list,
-        aggregated_key,
         n,
         n_square,
+        partial_key_list,
+        aggregated_key,
+        max_sequencer_count,
         _f: PhantomData,
     };
 

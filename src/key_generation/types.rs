@@ -25,16 +25,11 @@ impl PartialKey {
         limb_width: usize,
         limb_count: usize,
     ) -> DecomposedPartialKey<F> {
-        let decomposed_u = decompose_big::<F>(partial_key.u.clone(), limb_count, limb_width);
-        let decomposed_v = decompose_big::<F>(partial_key.v.clone(), limb_count * 2, limb_width);
-        let decomposed_y = decompose_big::<F>(partial_key.y.clone(), limb_count, limb_width);
-        let decomposed_w = decompose_big::<F>(partial_key.w.clone(), limb_count * 2, limb_width);
-
         DecomposedPartialKey {
-            u_limbs: decomposed_u,
-            v_limbs: decomposed_v,
-            y_limbs: decomposed_y,
-            w_limbs: decomposed_w,
+            u_limbs: decompose_big::<F>(partial_key.u.clone(), limb_count, limb_width),
+            v_limbs: decompose_big::<F>(partial_key.v.clone(), limb_count * 2, limb_width),
+            y_limbs: decompose_big::<F>(partial_key.y.clone(), limb_count, limb_width),
+            w_limbs: decompose_big::<F>(partial_key.w.clone(), limb_count * 2, limb_width),
         }
     }
 
@@ -46,9 +41,10 @@ impl PartialKey {
         let mut combined_partial = Vec::new();
 
         for partial_key in partial_key_list {
-            let decomposed_key =
-                Self::decompose_partial_key::<F>(&partial_key, limb_width, limb_count);
-            let combined_partial_limbs = decomposed_key.combine_limbs();
+            let combined_partial_limbs =
+                Self::decompose_partial_key::<F>(&partial_key, limb_width, limb_count)
+                    .combine_limbs();
+
             combined_partial.extend(combined_partial_limbs)
         }
 
@@ -105,7 +101,6 @@ impl<F: PrimeField> AssignedPartialKey<F> {
     }
 }
 
-/// ???
 #[derive(Clone, Debug)]
 pub struct DecomposedPartialKey<F: PrimeField> {
     pub u_limbs: Vec<F>,

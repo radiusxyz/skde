@@ -1,8 +1,10 @@
 use std::{str::FromStr, time::Instant};
 
 use delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle, PublicKey};
-use key_aggregation::aggregate_key_pairs;
-use key_generation::{generate_key, prove_partial_key_validity, verify_partial_key_validity};
+use key_aggregation::aggregate_key;
+use key_generation::{
+    generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
+};
 use num_bigint::BigUint;
 use skde::*;
 
@@ -20,7 +22,7 @@ fn main() {
         .enumerate()
         .map(|(index, _)| {
             let start = Instant::now();
-            let (secret_value, extraction_key) = generate_key(skde_params.clone());
+            let (secret_value, extraction_key) = generate_partial_key(&skde_params);
             let key_proof = prove_partial_key_validity(&skde_params, &secret_value);
             let generation_duration = start.elapsed();
             println!(
@@ -60,7 +62,7 @@ fn main() {
 
     // Aggregate all generated keys
     let aggregation_start = Instant::now();
-    let aggregated_key = aggregate_key_pairs(&skde_params, &extraction_keys);
+    let aggregated_key = aggregate_key(&skde_params, &extraction_keys);
     let aggregation_duration = aggregation_start.elapsed();
     println!("Aggregation time: {:?}", aggregation_duration);
 

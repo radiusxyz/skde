@@ -1,10 +1,11 @@
 use crate::{
     key_aggregation::{
-        AggregateInstructions, AggregateRawChip, AggregateRawConfig, AssignedExtractionKey,
-        PartialKey, UnassignedKeyAggregationPublicParams,
+        aggregate_assigned_key, assign_public_params, AggregateRawConfig, AggregatedKey,
+        AssignedAggregatedKey, AssignedExtractionKey, KeyAggregationRawChip, PartialKey,
+        UnassignedKeyAggregationPublicParams,
     },
-    key_generation::{AssignedPartialKey, UnassignedPartialKey},
-    BIT_COUNT, LIMB_WIDTH, MAX_SEQUENCER_NUMBER,
+    key_generation::{assign_partial_key, UnassignedPartialKey},
+    BIT_LEN, LIMB_WIDTH,
 };
 use big_integer::*;
 use ff::PrimeField;
@@ -25,17 +26,82 @@ pub struct AggregateRawCircuit<F: PrimeField> {
     pub n_square: BigUint,
 
     pub partial_key_list: Vec<PartialKey>,
-    pub aggregated_key: PartialKey,
+    pub aggregated_key: AggregatedKey,
+
+    pub max_sequencer_count: usize,
 
     pub _f: PhantomData<F>,
 }
 
 impl<F: PrimeField> AggregateRawCircuit<F> {
-    pub const BITS_LEN: usize = 2048; // n's bit length
-    pub const LIMB_WIDTH: usize = AggregateRawChip::<F>::LIMB_WIDTH;
+    pub const BIT_LEN: usize = BIT_LEN;
+    pub const LIMB_WIDTH: usize = LIMB_WIDTH;
+    pub const LIMB_COUNT: usize = BIT_LEN / LIMB_WIDTH;
 
-    fn aggregate_chip(&self, config: AggregateRawConfig) -> AggregateRawChip<F> {
-        AggregateRawChip::new(config, BIT_COUNT)
+    fn key_aggregation_chip(&self, config: AggregateRawConfig) -> KeyAggregationRawChip<F> {
+        KeyAggregationRawChip::new(
+            config,
+            Self::BIT_LEN,
+            Self::LIMB_WIDTH,
+            self.max_sequencer_count,
+        )
+    }
+
+    pub fn apply_aggregate_key_instance_constraints(
+        &self,
+        layouter: &mut impl halo2wrong::halo2::circuit::Layouter<F>,
+        aggregated_key: &AssignedAggregatedKey<F>,
+        limb_count: usize,
+        instance: Column<Instance>,
+    ) -> Result<(), Error> {
+        // let u_index = 0_usize;
+        let v_index = limb_count;
+        let y_index = limb_count * 3;
+        let w_index = limb_count * 4;
+
+        (0..limb_count).try_for_each(|i| -> Result<(), Error> {
+            layouter.constrain_instance(aggregated_key.u.limb(i).cell(), instance, i)?;
+            layouter.constrain_instance(aggregated_key.y.limb(i).cell(), instance, y_index + i)
+        })?;
+
+        (0..limb_count * 2).try_for_each(|i| -> Result<(), Error> {
+            layouter.constrain_instance(aggregated_key.v.limb(i).cell(), instance, v_index + i)?;
+            layouter.constrain_instance(aggregated_key.w.limb(i).cell(), instance, w_index + i)
+        })?;
+        Ok(())
+    }
+
+    pub fn apply_partial_key_instance_constraints(
+        &self,
+        layouter: &mut impl halo2wrong::halo2::circuit::Layouter<F>,
+        assigned_extraction_key: &AssignedExtractionKey<F>,
+        limb_count: usize,
+        instance: Column<Instance>,
+    ) -> Result<(), Error> {
+        (0..self.max_sequencer_count).try_for_each(|k| -> Result<(), Error> {
+            let u_limb = &assigned_extraction_key.partial_key_list[k].u;
+            let v_limb = &assigned_extraction_key.partial_key_list[k].v;
+            let y_limb = &assigned_extraction_key.partial_key_list[k].y;
+            let w_limb = &assigned_extraction_key.partial_key_list[k].w;
+
+            let base_index = k * 6 * limb_count;
+            let u_index = base_index + limb_count * 6;
+            let v_index = base_index + limb_count * 7;
+            let y_index = base_index + limb_count * 9;
+            let w_index = base_index + limb_count * 10;
+
+            (0..limb_count).try_for_each(|i| -> Result<(), Error> {
+                layouter.constrain_instance(u_limb.limb(i).cell(), instance, u_index + i)?;
+                layouter.constrain_instance(y_limb.limb(i).cell(), instance, y_index + i)
+            })?;
+
+            (0..limb_count * 2).try_for_each(|i| -> Result<(), Error> {
+                layouter.constrain_instance(v_limb.limb(i).cell(), instance, v_index + i)?;
+                layouter.constrain_instance(w_limb.limb(i).cell(), instance, w_index + i)
+            })?;
+
+            Ok(())
+        })
     }
 }
 
@@ -51,7 +117,9 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
         let main_gate_config = MainGate::<F>::configure(meta);
 
         let (composition_bit_lens, overflow_bit_lens) =
-            AggregateRawChip::<F>::compute_range_lens(BIT_COUNT / LIMB_WIDTH);
+            KeyAggregationRawChip::<F>::compute_range_lens(Self::LIMB_WIDTH, Self::LIMB_COUNT);
+        let (square_composition_bit_lens, square_overflow_bit_lens) =
+            KeyAggregationRawChip::<F>::compute_range_lens(Self::LIMB_WIDTH, Self::LIMB_COUNT * 2);
 
         let range_config = RangeChip::<F>::configure(
             meta,
@@ -59,9 +127,6 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
             composition_bit_lens,
             overflow_bit_lens,
         );
-
-        let (square_composition_bit_lens, square_overflow_bit_lens) =
-            AggregateRawChip::<F>::compute_range_lens(BIT_COUNT * 2 / LIMB_WIDTH);
 
         let square_range_config = RangeChip::<F>::configure(
             meta,
@@ -72,13 +137,8 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
 
         Self::Config {
             bigint_config: BigIntConfig::new(range_config.clone(), main_gate_config.clone()),
-            bigint_square_config: BigIntConfig::new(
-                square_range_config.clone(),
-                main_gate_config.clone(),
-            ),
+            bigint_square_config: BigIntConfig::new(square_range_config, main_gate_config),
             instance: meta.instance_column(),
-            limb_width: Self::LIMB_WIDTH,
-            limb_count: Self::BITS_LEN / Self::LIMB_WIDTH,
         }
     }
 
@@ -87,181 +147,127 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
         config: Self::Config,
         mut layouter: impl halo2wrong::halo2::circuit::Layouter<F>,
     ) -> Result<(), Error> {
-        let limb_width = Self::LIMB_WIDTH;
-        let limb_count = Self::BITS_LEN / Self::LIMB_WIDTH;
+        // TODO: check
+        let n_limbs = decompose_big::<F>(self.n.clone(), Self::LIMB_COUNT, Self::LIMB_WIDTH);
+        let unassigned_n = UnassignedInteger::from(n_limbs);
 
-        let instances = config.instance.clone();
+        let n_square_limbs = decompose_big::<F>(
+            self.n_square.clone(),
+            Self::LIMB_COUNT * 2,
+            Self::LIMB_WIDTH,
+        );
+        let unassigned_n_square = UnassignedInteger::from(n_square_limbs);
 
-        let aggregate_chip = self.aggregate_chip(config);
+        let instance = config.instance.clone();
+        let key_aggregation_raw_chip = self.key_aggregation_chip(config);
 
-        let bigint_chip = aggregate_chip.bigint_chip();
-        let bigint_square_chip = aggregate_chip.bigint_square_chip();
-
-        let (partial_keys_result, valid_agg_key_result) = layouter.assign_region(
+        let (assigned_extraction_key, aggregated_key) = layouter.assign_region(
             || "aggregate key test with 2048 bits RSA parameter",
             |region| {
-                let offset = 0;
-                let ctx = &mut RegionCtx::new(region, offset);
+                let ctx = &mut RegionCtx::new(region, 0);
 
-                let n_limbs = decompose_big::<F>(self.n.clone(), limb_count, limb_width);
-                let n_unassigned = UnassignedInteger::from(n_limbs);
+                let mut assigned_partial_key_list = vec![];
 
-                let n_square_limbs =
-                    decompose_big::<F>(self.n_square.clone(), limb_count * 2, limb_width);
-                let n_square_unassigned = UnassignedInteger::from(n_square_limbs);
-
-                let mut partial_keys_assigned = vec![];
-                for i in 0..MAX_SEQUENCER_NUMBER {
+                for i in 0..self.max_sequencer_count {
                     let decomposed_partial_key = PartialKey::decompose_partial_key(
                         &self.partial_key_list[i],
-                        limb_width,
-                        limb_count,
+                        Self::LIMB_WIDTH,
+                        Self::LIMB_COUNT,
                     );
 
                     let (u_unassigned, v_unassigned, y_unassigned, w_unassigned) =
                         decomposed_partial_key.to_unassigned_integers();
-
-                    let unassigned_extraction_key = UnassignedPartialKey {
+                    let unassigned_partial_key = UnassignedPartialKey {
                         u: u_unassigned,
                         v: v_unassigned,
                         y: y_unassigned,
                         w: w_unassigned,
                     };
-                    partial_keys_assigned
-                        .push(aggregate_chip.assign_partial_key(ctx, unassigned_extraction_key)?);
+                    assigned_partial_key_list.push(assign_partial_key(
+                        ctx,
+                        key_aggregation_raw_chip.bigint_chip(),
+                        key_aggregation_raw_chip.bigint_square_chip(),
+                        unassigned_partial_key,
+                    )?);
                 }
-                let partial_keys = AssignedExtractionKey {
-                    partial_keys: partial_keys_assigned,
+
+                let assigned_extraction_key = AssignedExtractionKey {
+                    partial_key_list: assigned_partial_key_list,
                 };
 
-                let public_params_unassigned = UnassignedKeyAggregationPublicParams {
-                    n: n_unassigned.clone(),
-                    n_square: n_square_unassigned.clone(),
+                let unassigned_public_params = UnassignedKeyAggregationPublicParams {
+                    n: unassigned_n.clone(),
+                    n_square: unassigned_n_square.clone(),
                 };
-                let public_params =
-                    aggregate_chip.assign_public_params(ctx, public_params_unassigned)?;
-                let valid_agg_key = aggregate_chip.aggregate_key(
+                let assigned_public_params = assign_public_params(
                     ctx,
-                    &partial_keys.clone(),
-                    &public_params.clone(),
+                    key_aggregation_raw_chip.bigint_chip(),
+                    key_aggregation_raw_chip.bigint_square_chip(),
+                    unassigned_public_params,
                 )?;
 
-                Ok((partial_keys, valid_agg_key))
+                let aggregated_key = aggregate_assigned_key(
+                    ctx,
+                    key_aggregation_raw_chip.bigint_chip(),
+                    key_aggregation_raw_chip.bigint_square_chip(),
+                    key_aggregation_raw_chip.max_sequencer_number(),
+                    &assigned_extraction_key.clone(),
+                    &assigned_public_params.clone(),
+                )?;
+
+                Ok((assigned_extraction_key, aggregated_key))
             },
         )?;
 
-        apply_aggregate_key_instance_constraints(
+        self.apply_aggregate_key_instance_constraints(
             &mut layouter,
-            &valid_agg_key_result,
-            limb_count,
-            instances,
+            &aggregated_key,
+            Self::LIMB_COUNT,
+            instance,
         )?;
 
-        apply_partial_key_instance_constraints(
+        self.apply_partial_key_instance_constraints(
             &mut layouter,
-            &partial_keys_result,
-            limb_count,
-            instances,
+            &assigned_extraction_key,
+            Self::LIMB_COUNT,
+            instance,
         )?;
 
-        let range_chip = bigint_chip.range_chip();
-        let range_square_chip = bigint_square_chip.range_chip();
-        range_chip.load_table(&mut layouter)?;
-        range_square_chip.load_table(&mut layouter)?;
+        key_aggregation_raw_chip
+            .bigint_chip()
+            .range_chip()
+            .load_table(&mut layouter)?;
+
+        key_aggregation_raw_chip
+            .bigint_square_chip()
+            .range_chip()
+            .load_table(&mut layouter)?;
 
         Ok(())
     }
 }
 
-pub fn apply_aggregate_key_instance_constraints<F: PrimeField>(
-    layouter: &mut impl halo2wrong::halo2::circuit::Layouter<F>,
-    valid_agg_key_result: &AssignedPartialKey<F>,
-    num_limbs: usize,
-    instances: Column<Instance>,
-) -> Result<(), Error> {
-    // let u_index = 0_usize;
-    let y_index = num_limbs * 3;
-    let v_index = num_limbs;
-    let w_index = num_limbs * 4;
-
-    (0..num_limbs).try_for_each(|i| -> Result<(), Error> {
-        layouter.constrain_instance(valid_agg_key_result.u.limb(i).cell(), instances, i)?;
-        layouter.constrain_instance(
-            valid_agg_key_result.y.limb(i).cell(),
-            instances,
-            y_index + i,
-        )
-    })?;
-
-    (0..num_limbs * 2).try_for_each(|i| -> Result<(), Error> {
-        layouter.constrain_instance(
-            valid_agg_key_result.v.limb(i).cell(),
-            instances,
-            v_index + i,
-        )?;
-        layouter.constrain_instance(
-            valid_agg_key_result.w.limb(i).cell(),
-            instances,
-            w_index + i,
-        )
-    })?;
-    Ok(())
-}
-
-pub fn apply_partial_key_instance_constraints<F: PrimeField>(
-    layouter: &mut impl halo2wrong::halo2::circuit::Layouter<F>,
-    assigned_extraction_key: &AssignedExtractionKey<F>,
-    num_limbs: usize,
-    instances: Column<Instance>,
-) -> Result<(), Error> {
-    (0..MAX_SEQUENCER_NUMBER).try_for_each(|k| -> Result<(), Error> {
-        let u_limb = &assigned_extraction_key.partial_keys[k].u;
-        let v_limb = &assigned_extraction_key.partial_keys[k].v;
-        let y_limb = &assigned_extraction_key.partial_keys[k].y;
-        let w_limb = &assigned_extraction_key.partial_keys[k].w;
-
-        let base_index = k * 6 * num_limbs;
-        let u_index = base_index + num_limbs * 6;
-        let v_index = base_index + num_limbs * 7;
-        let y_index = base_index + num_limbs * 9;
-        let w_index = base_index + num_limbs * 10;
-
-        (0..num_limbs).try_for_each(|i| -> Result<(), Error> {
-            layouter.constrain_instance(u_limb.limb(i).cell(), instances, u_index + i)?;
-            layouter.constrain_instance(y_limb.limb(i).cell(), instances, y_index + i)
-        })?;
-
-        (0..num_limbs * 2).try_for_each(|i| -> Result<(), Error> {
-            layouter.constrain_instance(v_limb.limb(i).cell(), instances, v_index + i)?;
-            layouter.constrain_instance(w_limb.limb(i).cell(), instances, w_index + i)
-        })?;
-
-        Ok(())
-    })
-}
-
+// TODO
 #[cfg(test)]
 mod tests {
     use crate::key_aggregation::*;
-    use crate::key_generation::DecomposedPartialKey;
-    use crate::BIT_COUNT;
-    use crate::LIMB_WIDTH;
     use crate::MAX_SEQUENCER_NUMBER;
 
+    use halo2wrong::curves::bn256::Fr;
     use maingate::mock_prover_verify;
     use num_bigint::BigUint;
+    use num_bigint::RandomBits;
+    use rand::{thread_rng, Rng};
     use std::marker::PhantomData;
 
     #[test]
     fn test_aggregate_circuit() {
-        use halo2wrong::curves::bn256::Fr;
-        use num_bigint::RandomBits;
-        use rand::{thread_rng, Rng};
         let mut rng = thread_rng();
 
-        let bit_len = BIT_COUNT as u64;
-        let limb_width = LIMB_WIDTH;
-        let limb_count = BIT_COUNT / limb_width;
+        let bit_len = AggregateRawCircuit::<Fr>::BIT_LEN as u64;
+        let limb_width = AggregateRawCircuit::<Fr>::LIMB_WIDTH;
+        let limb_count = AggregateRawCircuit::<Fr>::LIMB_COUNT;
+        let max_sequencer_number = MAX_SEQUENCER_NUMBER;
 
         let mut n = BigUint::default();
         while n.bits() != bit_len {
@@ -269,13 +275,13 @@ mod tests {
         }
         let n_square = &n * &n;
 
-        let mut partial_keys = vec![];
+        let mut partial_key_list = vec![];
 
-        let mut aggregated_key = PartialKey {
-            u: BigUint::from(1usize),
-            v: BigUint::from(1usize),
-            y: BigUint::from(1usize),
-            w: BigUint::from(1usize),
+        let mut aggregated_key = AggregatedKey {
+            u: BigUint::one(),
+            v: BigUint::one(),
+            y: BigUint::one(),
+            w: BigUint::one(),
         };
 
         for _ in 0..MAX_SEQUENCER_NUMBER {
@@ -284,7 +290,7 @@ mod tests {
             let y = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
             let w = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
 
-            partial_keys.push(PartialKey {
+            partial_key_list.push(PartialKey {
                 u: u.clone(),
                 v: v.clone(),
                 y: y.clone(),
@@ -298,20 +304,21 @@ mod tests {
         }
 
         let combined_partial_limbs: Vec<Fr> = PartialKey::decompose_and_combine_all_partial_keys(
-            partial_keys.clone(),
+            partial_key_list.clone(),
             limb_width,
             limb_count,
         );
 
-        let decomposed_extraction_key: DecomposedPartialKey<Fr> =
-            PartialKey::decompose_partial_key(&aggregated_key, limb_width, limb_count);
-        let mut combined_limbs = decomposed_extraction_key.combine_limbs();
+        let decomposed_aggregated_key: DecomposedAggregatedKey<Fr> =
+            AggregatedKey::decompose_partial_key(&aggregated_key, limb_width, limb_count);
+        let mut combined_limbs = decomposed_aggregated_key.combine_limbs();
 
         let circuit = AggregateRawCircuit::<Fr> {
-            partial_key_list: partial_keys,
-            aggregated_key,
             n,
             n_square,
+            partial_key_list,
+            aggregated_key,
+            max_sequencer_count: max_sequencer_number,
             _f: PhantomData,
         };
 

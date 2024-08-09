@@ -1175,9 +1175,9 @@ impl<F: PrimeField> BigIntChip<F> {
     ///
     /// # Return values
     /// Returns a new [`BigIntChip`]
-    pub fn new(config: BigIntConfig, limb_width: usize, bit_size: usize) -> Self {
-        assert_eq!(bit_size % limb_width, 0);
-        let num_limbs = bit_size / limb_width;
+    pub fn new(config: BigIntConfig, bit_len: usize, limb_width: usize) -> Self {
+        assert_eq!(bit_len % limb_width, 0);
+        let num_limbs = bit_len / limb_width;
         let max_word = Self::compute_mul_word_max(limb_width, num_limbs);
         assert!(Self::bits_size(&max_word) <= F::NUM_BITS as usize);
         BigIntChip {

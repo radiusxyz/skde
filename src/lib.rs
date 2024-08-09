@@ -4,12 +4,11 @@ use num_bigint::BigUint;
 pub mod delay_encryption;
 pub mod key_aggregation;
 pub mod key_generation;
-pub mod util;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
-pub const BIT_COUNT: usize = 2048; // n's bit length
+pub const BIT_LEN: usize = 2048; // n's bit length
 pub const LIMB_WIDTH: usize = 64;
-pub const LIMB_COUNT: usize = BIT_COUNT / LIMB_WIDTH;
+pub const LIMB_COUNT: usize = BIT_LEN / LIMB_WIDTH;
 
 pub const PRIME_P: &str = "8155133734070055735139271277173718200941522166153710213522626777763679009805792017274916613411023848268056376687809186180768200590914945958831360737612803";
 pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
@@ -17,7 +16,7 @@ pub const GENERATOR: &str = "4";
 pub const TIME_PARAM_T: u32 = 2; // delay time depends on: 2^TIME_PARMA_T
 
 #[derive(Debug, Clone)]
-pub struct SingleKeyDelayEncryptionParam {
+pub struct SkdeParams {
     pub n: BigUint, // RSA modulus n = p * q
     pub g: BigUint, // group generator
     pub t: u32,     // delay parameter
@@ -32,11 +31,11 @@ pub fn setup(
     q: BigUint,
     g: BigUint,
     max_sequencer_number: BigUint,
-) -> SingleKeyDelayEncryptionParam {
+) -> SkdeParams {
     let n = p * q;
     let h = mod_exp_by_pow_of_two(&g, t, &n);
 
-    SingleKeyDelayEncryptionParam {
+    SkdeParams {
         n,
         g,
         t,
@@ -51,8 +50,10 @@ mod tests {
 
     use crate::{
         delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle, PublicKey},
-        key_aggregation::aggregate_key_pairs,
-        key_generation::{generate_key, prove_partial_key_validity, verify_partial_key_validity},
+        key_aggregation::aggregate_key,
+        key_generation::{
+            generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
+        },
         setup,
     };
 
@@ -76,7 +77,7 @@ mod tests {
             .enumerate()
             .map(|(index, _)| {
                 let start = Instant::now();
-                let (secret_value, extraction_key) = generate_key(skde_params.clone());
+                let (secret_value, extraction_key) = generate_partial_key(&skde_params);
                 let partial_key_proof = prove_partial_key_validity(&skde_params, &secret_value);
                 let generation_duration = start.elapsed();
                 println!(
@@ -115,7 +116,7 @@ mod tests {
 
         // Aggregate all generated keys
         let aggregation_start = Instant::now();
-        let aggregated_key = aggregate_key_pairs(&skde_params, &extraction_keys);
+        let aggregated_key = aggregate_key(&skde_params, &extraction_keys);
         let aggregation_duration = aggregation_start.elapsed();
         println!("Aggregation time: {:?}", aggregation_duration);
 

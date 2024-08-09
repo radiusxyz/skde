@@ -1,9 +1,9 @@
-use big_integer::{big_mul_mod, big_pow_mod};
+use big_integer::{big_mul_mod, big_pow_mod, generate_random_biguint};
 use num_bigint::BigUint;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use sha2::{Digest, Sha512};
 
-use crate::{util::generate_random_biguint, SingleKeyDelayEncryptionParam, MAX_SEQUENCER_NUMBER};
+use crate::{SkdeParams, MAX_SEQUENCER_NUMBER};
 
 use super::{
     generate_uv_pair,
@@ -26,23 +26,23 @@ pub struct PartialKeyProof {
 }
 
 pub fn prove_partial_key_validity(
-    skde_params: &SingleKeyDelayEncryptionParam,
+    skde_params: &SkdeParams,
     secret_value: &SecretValue,
 ) -> PartialKeyProof {
     let r = &secret_value.r;
     let s = &secret_value.s;
     let k = &secret_value.k;
+    let t = BigUint::from(skde_params.t);
 
     let two_big = BigUint::from(2u32);
 
-    let t = BigUint::from(skde_params.t);
     let n_half = &skde_params.n / &two_big;
     let n_half_plus_n_over_m = &n_half + (&skde_params.n / MAX_SEQUENCER_NUMBER);
 
-    let x = generate_random_biguint(n_half_plus_n_over_m.bits());
     let l = generate_random_biguint(n_half.bits());
+    let x = generate_random_biguint(n_half_plus_n_over_m.bits());
 
-    let ab_pair = generate_uv_pair(&x, &l, skde_params);
+    let ab_pair = generate_uv_pair(skde_params, &x, &l);
 
     let a = ab_pair.u;
     let b = ab_pair.v;
@@ -75,7 +75,7 @@ pub fn prove_partial_key_validity(
 }
 
 pub fn verify_partial_key_validity(
-    skde_params: &SingleKeyDelayEncryptionParam,
+    skde_params: &SkdeParams,
     partial_key: PartialKey,
     partial_key_proof: PartialKeyProof,
 ) -> bool {
