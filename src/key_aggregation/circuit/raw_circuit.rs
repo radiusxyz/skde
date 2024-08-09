@@ -284,7 +284,7 @@ mod tests {
             w: BigUint::one(),
         };
 
-        for _ in 0..MAX_SEQUENCER_NUMBER {
+        for _ in 0..max_sequencer_number {
             let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
             let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
             let y = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;

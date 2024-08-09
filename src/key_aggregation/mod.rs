@@ -1,13 +1,11 @@
 mod chip;
 mod circuit;
 mod config;
-mod instructions;
 mod types;
 
 pub use chip::*;
 pub use circuit::*;
 pub use config::*;
-pub use instructions::*;
 pub use types::*;
 
 use crate::key_generation::PartialKey;
