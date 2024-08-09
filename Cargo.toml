@@ -71,9 +71,5 @@ harness = false
 name = "aggregate_with_hash"
 harness = false
 
-[[bin]]
-name = "test_performance"
-path = "src/bin/test_performance.rs"
-
 [profile.release]
 debug = true
