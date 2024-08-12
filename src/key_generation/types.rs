@@ -3,6 +3,7 @@ use ff::PrimeField;
 
 use maingate::{decompose_big, halo2::circuit::Value};
 use num_bigint::BigUint;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct SecretValue {
@@ -11,7 +12,7 @@ pub struct SecretValue {
     pub k: BigUint,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialKey {
     pub u: BigUint,
     pub v: BigUint,

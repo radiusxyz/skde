@@ -1,6 +1,7 @@
 use big_integer::{big_mul_mod, big_pow_mod, generate_random_biguint};
 use num_bigint::BigUint;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 
 use crate::{SkdeParams, MAX_SEQUENCER_NUMBER};
@@ -16,7 +17,7 @@ pub struct UVPair {
     pub v: BigUint,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartialKeyProof {
     pub a: BigUint,
     pub b: BigUint,

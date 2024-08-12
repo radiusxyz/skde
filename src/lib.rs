@@ -1,5 +1,6 @@
+pub use big_integer::generate_random_biguint;
 use big_integer::mod_exp_by_pow_of_two;
-use num_bigint::BigUint;
+pub use num_bigint::BigUint;
 
 pub mod delay_encryption;
 pub mod key_aggregation;
@@ -77,7 +78,7 @@ mod tests {
             .enumerate()
             .map(|(index, _)| {
                 let start = Instant::now();
-                let (secret_value, extraction_key) = generate_partial_key(&skde_params);
+                let (secret_value, partial_key) = generate_partial_key(&skde_params);
                 let key_proof = prove_partial_key_validity(&skde_params, &secret_value);
                 let generation_duration = start.elapsed();
                 println!(
@@ -85,7 +86,7 @@ mod tests {
                     index + 1,
                     generation_duration
                 );
-                (extraction_key, key_proof)
+                (partial_key, key_proof)
             })
             .collect();
 
@@ -93,11 +94,11 @@ mod tests {
         let verification_start = Instant::now();
         generated_keys_and_proofs
             .iter()
-            .for_each(|(extraction_key, key_proof)| {
+            .for_each(|(partial_key, key_proof)| {
                 assert!(
                     verify_partial_key_validity(
                         &skde_params,
-                        extraction_key.clone(),
+                        partial_key.clone(),
                         key_proof.clone()
                     ),
                     "Key verification failed"
