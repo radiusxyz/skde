@@ -2,10 +2,11 @@ use big_integer::{AssignedInteger, Fresh};
 use ff::PrimeField;
 use maingate::decompose_big;
 use num_bigint::BigUint;
+use serde::{Deserialize, Serialize};
 
 use crate::key_generation::{AssignedPartialKey, UnassignedPartialKey};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregatedKey {
     pub u: BigUint,
     pub v: BigUint,
