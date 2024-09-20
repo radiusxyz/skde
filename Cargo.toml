@@ -36,6 +36,7 @@ big-integer = { workspace = true }
 poseidon = { workspace = true }
 hash = { workspace = true }
 serde = { workspace = true }
+num-prime = "0.4.4"
 
 [workspace.dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
