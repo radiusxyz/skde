@@ -71,7 +71,7 @@ mod tests {
         let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
 
         let skde_params = setup(time, p, q, g, max_sequencer_number);
-        let message: &str = "f869018203e882520894f17f52151ebef6c7334fad080c5704d77216b732881bc16d674ec80000801ba02da1c48b670996dcb1f447ef9ef00b33033c48a4fe938f420bec3e56bfd24071a062e0aa78a81bf0290afbc3a9d8e9a068e6d74caa66c5e0fa8a46deaae96b0833";
+        let message: &str = "0xf869018203e882520894f17f52151ebef6c7334fad080c5704d77216b732881bc16d674ec80000801ba02da1c48b670996dcb1f447ef9ef00b33033c48a4fe";
 
         // 1. Generate partial keys and proofs
         let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
@@ -128,7 +128,7 @@ mod tests {
 
         // 4. Encrypt the message
         let encryption_start = Instant::now();
-        let cipher_text = encrypt(&skde_params, message, &encryption_key, 16).unwrap();
+        let cipher_text = encrypt(&skde_params, message, &encryption_key).unwrap();
         let encryption_duration = encryption_start.elapsed();
         println!("Encryption time: {:?}", encryption_duration);
 
@@ -140,7 +140,7 @@ mod tests {
 
         // 6. Decrypt the cipher text
         let decryption_start = Instant::now();
-        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key, 16).unwrap();
+        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key).unwrap();
         let decryption_duration = decryption_start.elapsed();
         println!("Decryption time: {:?}", decryption_duration);
 

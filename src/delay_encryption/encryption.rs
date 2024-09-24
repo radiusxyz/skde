@@ -13,16 +13,13 @@ pub fn encrypt(
     skde_params: &SkdeParams,
     message: &str,
     encryption_key: &PublicKey,
-    radix: u32,
 ) -> io::Result<CipherPair> {
-    // TODO: Arbitrary Length of Message
-    let plain_text;
-    if message.starts_with("0x") {
-        plain_text = BigUint::from_str_radix(&message[2..], radix).expect("Invalid message");
-    } else {
-        plain_text = BigUint::from_str_radix(message, radix).expect("Invalid message");
-    }
+    let message_hex_string = string_to_hex(message);
 
+    let plain_text = BigUint::from_str_radix(&message_hex_string, 16).expect("Invalid message");
+
+    // TODO: Arbitrary Length of Message
+    // TODO: Support for message length greater than N
     if plain_text >= skde_params.n {
         return Err(io::Error::new(
             ErrorKind::Other,
@@ -48,7 +45,6 @@ pub fn decrypt(
     skde_params: &SkdeParams,
     cipher_text: &CipherPair,
     decryption_key: &SecretKey,
-    radix: u32,
 ) -> io::Result<String> {
     let cipher1 = BigUint::from_str(&cipher_text.c1).unwrap();
     let cipher2 = BigUint::from_str(&cipher_text.c2).unwrap();
@@ -59,6 +55,24 @@ pub fn decrypt(
         .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "No modular inverse found"))?;
 
     let result = (cipher2 * inv_mod) % &skde_params.n;
+    let message_hex_string = result.to_str_radix(16);
 
-    Ok(result.to_str_radix(radix))
+    let message = hex_to_string(&message_hex_string).unwrap();
+
+    Ok(message)
+}
+
+fn string_to_hex(s: &str) -> String {
+    let vec: Vec<u8> = s.as_bytes().to_vec(); // 문자열을 벡터로 변환
+    let hex_string: String = vec.iter().map(|byte| format!("{:02x}", byte)).collect();
+    hex_string
+}
+
+fn hex_to_string(hex: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16))
+        .collect::<Result<Vec<u8>, _>>()?;
+    let result_string = String::from_utf8(bytes)?;
+    Ok(result_string)
 }
