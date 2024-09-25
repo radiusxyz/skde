@@ -71,6 +71,7 @@ mod tests {
         let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
 
         let skde_params = setup(time, p, q, g, max_sequencer_number);
+        // TODO: DH
         let message: &str = "0xf869018203e882520894f17f52151ebef6c7334fad080c5704d77216b732881bc16d674ec80000801ba02da1c48b670996dcb1f447ef9ef00b33033c48a4fe";
 
         // 1. Generate partial keys and proofs
