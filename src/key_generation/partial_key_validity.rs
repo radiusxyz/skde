@@ -4,12 +4,11 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 
-use crate::{SkdeParams, MAX_SEQUENCER_NUMBER};
-
 use super::{
     generate_uv_pair,
     types::{PartialKey, SecretValue},
 };
+use crate::{SkdeParams, MAX_SEQUENCER_NUMBER};
 
 #[derive(Debug, Clone)]
 pub struct UVPair {

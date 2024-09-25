@@ -49,18 +49,16 @@ pub fn setup(
 mod tests {
     use std::{str::FromStr, time::Instant};
 
+    use num_bigint::BigUint;
+
     use crate::{
         delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle, PublicKey},
         key_aggregation::aggregate_key,
         key_generation::{
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
         },
-        setup,
+        setup, GENERATOR, MAX_SEQUENCER_NUMBER, PRIME_P, PRIME_Q, TIME_PARAM_T,
     };
-
-    use num_bigint::BigUint;
-
-    use crate::{GENERATOR, MAX_SEQUENCER_NUMBER, PRIME_P, PRIME_Q, TIME_PARAM_T};
 
     #[test]
     fn test_single_key_delay_encryption() {
@@ -71,7 +69,6 @@ mod tests {
         let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
 
         let skde_params = setup(time, p, q, g, max_sequencer_number);
-        // TODO: DH
         let message: &str = "0xf869018203e882520894f17f52151ebef6c7334fad080c5704d77216b732881bc16d674ec80000801ba02da1c48b670996dcb1f447ef9ef00b33033c48a4fe";
 
         // 1. Generate partial keys and proofs
@@ -147,7 +144,7 @@ mod tests {
 
         assert_eq!(
             message, decrypted_message,
-            "Decrypted message does not same with the original message"
+            "Decrypted message is not the same with the original message"
         );
     }
 }
