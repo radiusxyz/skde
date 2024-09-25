@@ -4,9 +4,8 @@ use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod, can_be_divided};
 use num_bigint::BigUint;
 use num_traits::One;
 
-use crate::{key_aggregation::AggregatedKey, SkdeParams};
-
 use super::SecretKey;
+use crate::{key_aggregation::AggregatedKey, SkdeParams};
 
 pub fn solve_time_lock_puzzle(
     skde_params: &SkdeParams,

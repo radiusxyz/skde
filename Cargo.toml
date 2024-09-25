@@ -36,6 +36,7 @@ big-integer = { workspace = true }
 poseidon = { workspace = true }
 hash = { workspace = true }
 serde = { workspace = true }
+const-hex = "1.12"
 
 [workspace.dependencies]
 serde = { version = "1.0.197", features = ["derive"] }

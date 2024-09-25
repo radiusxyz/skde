@@ -1,16 +1,16 @@
 mod partial_key_validity;
 mod types;
 
-pub use partial_key_validity::*;
-pub use types::*;
-
-use crate::SkdeParams;
 use big_integer::{big_pow_mod, generate_random_biguint, BigIntChip, BigIntInstructions};
 use ff::PrimeField;
 use halo2wrong::halo2::plonk::Error;
 use maingate::RegionCtx;
 use num_bigint::BigUint;
 use num_traits::One;
+pub use partial_key_validity::*;
+pub use types::*;
+
+use crate::SkdeParams;
 
 pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKey) {
     let two_big: BigUint = BigUint::from(2u32);

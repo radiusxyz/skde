@@ -3,22 +3,18 @@ mod circuit;
 mod config;
 mod types;
 
+use big_integer::{BigIntChip, BigIntInstructions, UnassignedInteger, *};
 pub use chip::*;
 pub use circuit::*;
 pub use config::*;
-pub use types::*;
-
-use crate::key_generation::PartialKey;
-use crate::SkdeParams;
-use big_integer::UnassignedInteger;
-use big_integer::*;
-use big_integer::{BigIntChip, BigIntInstructions};
 use ff::PrimeField;
-use halo2wrong::halo2::circuit::Value;
-use halo2wrong::halo2::plonk::Error;
+use halo2wrong::halo2::{circuit::Value, plonk::Error};
 use maingate::RegionCtx;
 use num_bigint::BigUint;
 use num_traits::One;
+pub use types::*;
+
+use crate::{key_generation::PartialKey, SkdeParams};
 
 /// Public Parameters that is about to be assigned.
 #[derive(Clone, Debug)]

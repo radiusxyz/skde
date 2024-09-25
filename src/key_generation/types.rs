@@ -1,6 +1,5 @@
 use big_integer::{AssignedInteger, Fresh, UnassignedInteger};
 use ff::PrimeField;
-
 use maingate::{decompose_big, halo2::circuit::Value};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};

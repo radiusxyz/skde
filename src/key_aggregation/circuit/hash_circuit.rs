@@ -1,10 +1,7 @@
-use crate::key_aggregation::*;
-use crate::key_generation::AssignedPartialKey;
-use crate::BIT_LEN;
-use crate::LIMB_WIDTH;
+use std::marker::PhantomData;
+
 use big_integer::*;
-use ff::FromUniformBytes;
-use ff::PrimeField;
+use ff::{FromUniformBytes, PrimeField};
 use halo2wrong::{
     halo2::{
         circuit::SimpleFloorPlanner,
@@ -12,12 +9,13 @@ use halo2wrong::{
     },
     RegionCtx,
 };
-use maingate::big_to_fe;
-use maingate::MainGateInstructions;
-use maingate::{decompose_big, MainGate, RangeChip, RangeInstructions};
+use maingate::{
+    big_to_fe, decompose_big, MainGate, MainGateInstructions, RangeChip, RangeInstructions,
+};
 use num_bigint::BigUint;
 use poseidon::*;
-use std::marker::PhantomData;
+
+use crate::{key_aggregation::*, key_generation::AssignedPartialKey, BIT_LEN, LIMB_WIDTH};
 
 #[derive(Clone, Debug)]
 pub struct AggregateHashCircuit<F: PrimeField, const T: usize, const RATE: usize> {
@@ -104,7 +102,7 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
         config: Self::Config,
         mut layouter: impl halo2wrong::halo2::circuit::Layouter<F>,
     ) -> Result<(), Error> {
-        let instance = config.instance.clone();
+        let instance = config.instance;
         let key_aggregation_chip = self.key_aggregation_chip(config.clone());
 
         let bigint_chip = key_aggregation_chip.bigint_chip();
@@ -361,22 +359,15 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
 // TODO
 #[cfg(test)]
 mod tests {
-    use crate::key_aggregation::*;
-
-    use crate::BIT_LEN;
-    use crate::MAX_SEQUENCER_NUMBER;
-
-    use maingate::big_to_fe;
+    use std::marker::PhantomData;
 
     use halo2wrong::curves::bn256::Fr;
-    use maingate::decompose_big;
-    use maingate::mock_prover_verify;
-    use num_bigint::BigUint;
-    use num_bigint::RandomBits;
-    use poseidon::Poseidon;
-    use poseidon::Spec;
+    use maingate::{big_to_fe, decompose_big, mock_prover_verify};
+    use num_bigint::{BigUint, RandomBits};
+    use poseidon::{Poseidon, Spec};
     use rand::{thread_rng, Rng};
-    use std::marker::PhantomData;
+
+    use crate::{key_aggregation::*, BIT_LEN, MAX_SEQUENCER_NUMBER};
 
     #[test]
     fn test_aggregate_with_hash_circuit() {

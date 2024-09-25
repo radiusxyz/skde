@@ -1,12 +1,5 @@
-use crate::{
-    key_aggregation::{
-        aggregate_assigned_key, assign_public_params, AggregateRawConfig, AggregatedKey,
-        AssignedAggregatedKey, AssignedExtractionKey, KeyAggregationRawChip, PartialKey,
-        UnassignedKeyAggregationPublicParams,
-    },
-    key_generation::{assign_partial_key, UnassignedPartialKey},
-    BIT_LEN, LIMB_WIDTH,
-};
+use std::marker::PhantomData;
+
 use big_integer::*;
 use ff::PrimeField;
 use halo2wrong::{
@@ -18,7 +11,16 @@ use halo2wrong::{
 };
 use maingate::{decompose_big, MainGate, RangeChip, RangeInstructions};
 use num_bigint::BigUint;
-use std::marker::PhantomData;
+
+use crate::{
+    key_aggregation::{
+        aggregate_assigned_key, assign_public_params, AggregateRawConfig, AggregatedKey,
+        AssignedAggregatedKey, AssignedExtractionKey, KeyAggregationRawChip, PartialKey,
+        UnassignedKeyAggregationPublicParams,
+    },
+    key_generation::{assign_partial_key, UnassignedPartialKey},
+    BIT_LEN, LIMB_WIDTH,
+};
 
 #[derive(Clone, Debug)]
 pub struct AggregateRawCircuit<F: PrimeField> {
@@ -158,7 +160,7 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
         );
         let unassigned_n_square = UnassignedInteger::from(n_square_limbs);
 
-        let instance = config.instance.clone();
+        let instance = config.instance;
         let key_aggregation_raw_chip = self.key_aggregation_chip(config);
 
         let (assigned_extraction_key, aggregated_key) = layouter.assign_region(
@@ -250,15 +252,14 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
 // TODO
 #[cfg(test)]
 mod tests {
-    use crate::key_aggregation::*;
-    use crate::MAX_SEQUENCER_NUMBER;
+    use std::marker::PhantomData;
 
     use halo2wrong::curves::bn256::Fr;
     use maingate::mock_prover_verify;
-    use num_bigint::BigUint;
-    use num_bigint::RandomBits;
+    use num_bigint::{BigUint, RandomBits};
     use rand::{thread_rng, Rng};
-    use std::marker::PhantomData;
+
+    use crate::{key_aggregation::*, MAX_SEQUENCER_NUMBER};
 
     #[test]
     fn test_aggregate_circuit() {
