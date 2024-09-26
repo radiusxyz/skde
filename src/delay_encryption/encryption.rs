@@ -15,15 +15,16 @@ pub fn encrypt(
     skde_params: &SkdeParams,
     message: impl AsRef<str>,
     encryption_key: &PublicKey,
-) -> Result<Ciphertext, EncryptionError> {
+) -> Result<String, EncryptionError> {
     let cipher_pair_list: Result<Vec<CipherPair>, EncryptionError> = message
         .as_ref()
         .as_bytes()
         .chunks(64)
         .map(|slice| encrypt_slice(skde_params, slice, encryption_key))
         .collect();
+    let ciphertext = Ciphertext::from(cipher_pair_list?);
 
-    Ok(cipher_pair_list?.into())
+    Ok(ciphertext.to_string())
 }
 
 fn encrypt_slice(
@@ -64,10 +65,11 @@ impl std::error::Error for EncryptionError {}
 
 pub fn decrypt(
     skde_params: &SkdeParams,
-    ciphertext: &Ciphertext,
+    ciphertext: &str,
     decryption_key: &SecretKey,
 ) -> Result<String, DecryptionError> {
     let mut message = String::new();
+    let ciphertext = Ciphertext::from_str(ciphertext).map_err(DecryptionError::ParseCiphtertext)?;
     ciphertext.iter().try_for_each(|cipher_pair| {
         decrypt_inner(&mut message, skde_params, cipher_pair, decryption_key)
     })?;
@@ -102,6 +104,7 @@ fn decrypt_inner(
 
 #[derive(Debug)]
 pub enum DecryptionError {
+    ParseCiphtertext(crate::delay_encryption::types::ParseError),
     ParseBigUint(num_bigint::ParseBigIntError),
     NoModularInverseFound,
     WriteMessage(std::fmt::Error),
