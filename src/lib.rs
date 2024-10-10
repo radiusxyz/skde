@@ -1,10 +1,13 @@
 pub use big_integer::generate_random_biguint;
 use big_integer::mod_exp_by_pow_of_two;
 pub use num_bigint::BigUint;
+#[cfg(target_family = "wasm")]
+pub mod wasm;
 
 pub mod delay_encryption;
 pub mod key_aggregation;
 pub mod key_generation;
+use crate::delay_encryption::SkdeParams;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
 pub const BIT_LEN: usize = 2048; // n's bit length
@@ -15,16 +18,6 @@ pub const PRIME_P: &str = "81551337340700557351392712771737182009415221661537102
 pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
 pub const GENERATOR: &str = "4";
 pub const TIME_PARAM_T: u32 = 2; // delay time depends on: 2^TIME_PARMA_T
-
-#[derive(Debug, Clone)]
-pub struct SkdeParams {
-    pub n: BigUint, // RSA modulus n = p * q
-    pub g: BigUint, // group generator
-    pub t: u32,     // delay parameter
-    pub h: BigUint, // g^{2^t} mod n
-
-    pub max_sequencer_number: BigUint,
-}
 
 pub fn setup(
     t: u32,
