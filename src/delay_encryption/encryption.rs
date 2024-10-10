@@ -1,8 +1,8 @@
-use std::{fmt::Write, str::FromStr};
+use std::io::Write;
 
 use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod};
 use num_bigint::{BigUint, RandBigInt};
-use num_traits::Num;
+use num_traits::FromBytes;
 use rand::thread_rng;
 
 use crate::{
@@ -10,49 +10,43 @@ use crate::{
     SkdeParams,
 };
 
+const CHUNK_SIZE: usize = 64;
+
 /// TODO: Modify chunk size to increase performance.
 pub fn encrypt(
     skde_params: &SkdeParams,
     message: impl AsRef<str>,
     encryption_key: &PublicKey,
 ) -> Result<String, EncryptionError> {
-    let cipher_pair_list: Result<Vec<CipherPair>, EncryptionError> = message
-        .as_ref()
-        .as_bytes()
-        .chunks(64)
+    let bytes = const_hex::decode(message.as_ref()).map_err(EncryptionError::EncodeMessage)?;
+    let cipher_pair_list: Vec<CipherPair> = bytes
+        .chunks(CHUNK_SIZE)
         .map(|slice| encrypt_slice(skde_params, slice, encryption_key))
         .collect();
-    let ciphertext = Ciphertext::from(cipher_pair_list?);
+    let ciphertext = Ciphertext::from(cipher_pair_list);
+    let bytes = bincode::serialize(&ciphertext).map_err(EncryptionError::EncodeCiphertext)?;
 
-    Ok(ciphertext.to_string())
+    Ok(const_hex::encode_prefixed(bytes))
 }
 
-fn encrypt_slice(
-    skde_params: &SkdeParams,
-    slice: &[u8],
-    encryption_key: &PublicKey,
-) -> Result<CipherPair, EncryptionError> {
-    let message_str = std::str::from_utf8(slice).map_err(EncryptionError::InvalidUtf8)?;
-    let message_hex_string = const_hex::encode(message_str);
-    let plain_text =
-        BigUint::from_str_radix(&message_hex_string, 16).map_err(EncryptionError::ParseBigUint)?;
+fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &PublicKey) -> CipherPair {
+    println!("input slice: {:?}", slice);
+    println!("skde.n: {}", skde_params.n);
 
+    let plain_text = BigUint::from_be_bytes(slice);
     let mut rng = thread_rng();
     let l: BigUint = rng.gen_biguint(skde_params.n.bits() / 2);
     let pk_pow_l = big_pow_mod(&encryption_key.pk, &l, &skde_params.n);
-    let cipher1 = big_pow_mod(&skde_params.g, &l, &skde_params.n);
-    let cipher2 = big_mul_mod(&plain_text, &pk_pow_l, &skde_params.n);
+    let c1 = big_pow_mod(&skde_params.g, &l, &skde_params.n);
+    let c2 = big_mul_mod(&plain_text, &pk_pow_l, &skde_params.n);
 
-    Ok(CipherPair {
-        c1: cipher1.to_str_radix(10),
-        c2: cipher2.to_str_radix(10),
-    })
+    CipherPair { c1, c2 }
 }
 
 #[derive(Debug)]
 pub enum EncryptionError {
-    InvalidUtf8(std::str::Utf8Error),
-    ParseBigUint(num_bigint::ParseBigIntError),
+    EncodeMessage(const_hex::FromHexError),
+    EncodeCiphertext(bincode::Error),
 }
 
 impl std::fmt::Display for EncryptionError {
@@ -68,48 +62,48 @@ pub fn decrypt(
     ciphertext: &str,
     decryption_key: &SecretKey,
 ) -> Result<String, DecryptionError> {
-    let mut message = String::new();
-    let ciphertext = Ciphertext::from_str(ciphertext).map_err(DecryptionError::ParseCiphtertext)?;
-    ciphertext.iter().try_for_each(|cipher_pair| {
-        decrypt_inner(&mut message, skde_params, cipher_pair, decryption_key)
-    })?;
+    println!("length: {}, text: {}", ciphertext.len(), ciphertext);
 
-    let message_vec = const_hex::decode(message).map_err(DecryptionError::DecodeHexString)?;
-    let message_string = String::from_utf8(message_vec).map_err(DecryptionError::InvalidUtf8)?;
+    let bytes = const_hex::decode(ciphertext).map_err(DecryptionError::DecodeHexString)?;
+    let ciphertext =
+        bincode::deserialize::<Ciphertext>(&bytes).map_err(DecryptionError::DecodeCiphertext)?;
 
-    Ok(message_string)
+    let mut message_bytes = Vec::new();
+    for cipher_pair in ciphertext.iter() {
+        decrypt_inner(&mut message_bytes, skde_params, cipher_pair, decryption_key)?;
+    }
+
+    Ok(const_hex::encode_prefixed(message_bytes))
 }
 
 fn decrypt_inner(
-    message: &mut String,
+    message_bytes: &mut Vec<u8>,
     skde_params: &SkdeParams,
     cipher_pair: &CipherPair,
     decryption_key: &SecretKey,
 ) -> Result<(), DecryptionError> {
-    let cipher_1 = BigUint::from_str(&cipher_pair.c1).map_err(DecryptionError::ParseBigUint)?;
-    let cipher_2 = BigUint::from_str(&cipher_pair.c2).map_err(DecryptionError::ParseBigUint)?;
-
-    let exponentiation = big_pow_mod(&cipher_1, &decryption_key.sk, &skde_params.n);
+    let exponentiation = big_pow_mod(&cipher_pair.c1, &decryption_key.sk, &skde_params.n);
 
     let inv_mod = big_mod_inv(&exponentiation, &skde_params.n)
         .ok_or(DecryptionError::NoModularInverseFound)?;
 
-    let output = ((cipher_2 * inv_mod) % &skde_params.n).to_str_radix(16);
-    message
-        .write_str(&output)
-        .map_err(DecryptionError::WriteMessage)?;
+    let output = (cipher_pair.c2.clone() * inv_mod) % &skde_params.n;
+    let output_bytes = output.to_bytes_be();
+    println!("output slice: {:?}", output_bytes.as_slice());
+    message_bytes
+        .write(&output.to_bytes_be())
+        .map_err(DecryptionError::WriteBytes)?;
 
     Ok(())
 }
 
 #[derive(Debug)]
 pub enum DecryptionError {
-    ParseCiphtertext(crate::delay_encryption::types::ParseError),
-    ParseBigUint(num_bigint::ParseBigIntError),
-    NoModularInverseFound,
-    WriteMessage(std::fmt::Error),
     DecodeHexString(const_hex::FromHexError),
-    InvalidUtf8(std::string::FromUtf8Error),
+    DecodeCiphertext(bincode::Error),
+    NoModularInverseFound,
+    WriteBytes(std::io::Error),
+    DecodeMessage(std::str::Utf8Error),
 }
 
 impl std::fmt::Display for DecryptionError {
