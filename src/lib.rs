@@ -1,12 +1,11 @@
 pub use big_integer::generate_random_biguint;
 use big_integer::mod_exp_by_pow_of_two;
 pub use num_bigint::BigUint;
-#[cfg(target_family = "wasm")]
-pub mod wasm;
 
 pub mod delay_encryption;
 pub mod key_aggregation;
 pub mod key_generation;
+pub mod wasm;
 use crate::delay_encryption::SkdeParams;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
