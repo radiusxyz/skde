@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn works() {
-        for _ in 0..10 {
+        for _ in 0..20 {
             test_single_key_delay_encryption();
         }
     }

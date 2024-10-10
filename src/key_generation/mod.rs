@@ -18,9 +18,9 @@ pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKe
     let n_half: BigUint = &skde_params.n / two_big;
     let n_half_over_m: BigUint = &n_half / skde_params.max_sequencer_number.clone();
 
-    let r = generate_random_biguint(n_half_over_m.bits());
-    let s = generate_random_biguint(n_half_over_m.bits());
-    let k = generate_random_biguint(n_half.bits());
+    let r = generate_random_biguint(&n_half_over_m);
+    let s = generate_random_biguint(&n_half_over_m);
+    let k = generate_random_biguint(&n_half);
 
     let uv_pair = generate_uv_pair(skde_params, &(&r + &s), &s);
     let yw_pair = generate_uv_pair(skde_params, &k, &r);
