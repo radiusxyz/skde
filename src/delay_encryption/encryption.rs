@@ -30,9 +30,6 @@ pub fn encrypt(
 }
 
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &PublicKey) -> CipherPair {
-    println!("input slice: {:?}", slice);
-    println!("skde.n: {}", skde_params.n);
-
     let plain_text = BigUint::from_be_bytes(slice);
     let mut rng = thread_rng();
     let l: BigUint = rng.gen_biguint(skde_params.n.bits() / 2);
@@ -62,8 +59,6 @@ pub fn decrypt(
     ciphertext: &str,
     decryption_key: &SecretKey,
 ) -> Result<String, DecryptionError> {
-    println!("length: {}, text: {}", ciphertext.len(), ciphertext);
-
     let bytes = const_hex::decode(ciphertext).map_err(DecryptionError::DecodeHexString)?;
     let ciphertext =
         bincode::deserialize::<Ciphertext>(&bytes).map_err(DecryptionError::DecodeCiphertext)?;
@@ -88,8 +83,6 @@ fn decrypt_inner(
         .ok_or(DecryptionError::NoModularInverseFound)?;
 
     let output = (cipher_pair.c2.clone() * inv_mod) % &skde_params.n;
-    let output_bytes = output.to_bytes_be();
-    println!("output slice: {:?}", output_bytes.as_slice());
     message_bytes
         .write(&output.to_bytes_be())
         .map_err(DecryptionError::WriteBytes)?;
