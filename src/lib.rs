@@ -147,4 +147,11 @@ mod tests {
             "Decrypted message is not the same with the original message"
         );
     }
+
+    #[test]
+    fn works() {
+        for _ in 0..20 {
+            test_single_key_delay_encryption();
+        }
+    }
 }
