@@ -8,7 +8,7 @@ use super::{
     generate_uv_pair,
     types::{PartialKey, SecretValue},
 };
-use crate::{SkdeParams, MAX_SEQUENCER_NUMBER};
+use crate::{SkdeParams, MAX_SEQUENCER_NUMBER, BIT_LEN};
 
 #[derive(Debug, Clone)]
 pub struct UVPair {
@@ -33,14 +33,21 @@ pub fn prove_partial_key_validity(
     let s = &secret_value.s;
     let k = &secret_value.k;
     let t = BigUint::from(skde_params.t);
+    let bit_len_big = BigUint::from(BIT_LEN);
 
     let two_big = BigUint::from(2u32);
+    let twice_bit_len_big = &two_big * bit_len_big;
+    let two_big_pow = &big_pow_mod(&two_big, &twice_bit_len_big, &skde_params.n);
 
     let n_half = &skde_params.n / &two_big;
-    let n_half_plus_n_over_m = &n_half + (&skde_params.n / MAX_SEQUENCER_NUMBER);
+    let n_over_m = &skde_params.n / MAX_SEQUENCER_NUMBER; 
+    let n_half_plus_n_over_m = &n_half + &n_over_m;
 
-    let l = generate_random_biguint(n_half.bits());
-    let x = generate_random_biguint(n_half_plus_n_over_m.bits());
+    let l_range = n_over_m * two_big_pow;
+    let x_range = n_half_plus_n_over_m * two_big_pow;
+
+    let l = generate_random_biguint(&l_range);
+    let x = generate_random_biguint(&x_range);
 
     let ab_pair = generate_uv_pair(skde_params, &x, &l);
 

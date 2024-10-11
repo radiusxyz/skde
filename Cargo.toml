@@ -17,9 +17,9 @@ members = [
     "crates/poseidon",
     "crates/big_integer",
 ]
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bincode = "1.3"
 maingate  = { workspace = true }
 halo2wrong  = { workspace = true }
 rand  = { workspace = true }
