@@ -31,3 +31,13 @@ impl Ciphertext {
         self.0.iter()
     }
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SkdeParams {
+    pub n: BigUint, // RSA modulus n = p * q
+    pub g: BigUint, // group generator
+    pub t: u32,     // delay parameter
+    pub h: BigUint, // g^{2^t} mod n
+
+    pub max_sequencer_number: BigUint,
+}
