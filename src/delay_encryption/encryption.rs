@@ -12,21 +12,27 @@ use crate::{
 
 const CHUNK_SIZE: usize = 64;
 
-/// TODO: Modify chunk size to increase performance.
+/// Return the encrypted message as hexadecimal string.
+///
+/// # Todo:
+/// - Modify chunk size to increase performance.
+/// - The input message type will generalize to type `T` that implements
+///   `AsRef<[u8]>`.
 pub fn encrypt(
     skde_params: &SkdeParams,
-    message: impl AsRef<str>,
+    message: &str,
     encryption_key: &PublicKey,
 ) -> Result<String, EncryptionError> {
-    let bytes = const_hex::decode(message.as_ref()).map_err(EncryptionError::EncodeMessage)?;
-    let cipher_pair_list: Vec<CipherPair> = bytes
+    let cipher_pair_list: Vec<CipherPair> = message
+        .as_bytes()
         .chunks(CHUNK_SIZE)
         .map(|slice| encrypt_slice(skde_params, slice, encryption_key))
         .collect();
     let ciphertext = Ciphertext::from(cipher_pair_list);
     let bytes = bincode::serialize(&ciphertext).map_err(EncryptionError::EncodeCiphertext)?;
+    let encrypted_message = const_hex::encode(bytes);
 
-    Ok(const_hex::encode_prefixed(bytes))
+    Ok(encrypted_message)
 }
 
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &PublicKey) -> CipherPair {
@@ -42,8 +48,8 @@ fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &Public
 
 #[derive(Debug)]
 pub enum EncryptionError {
-    EncodeMessage(const_hex::FromHexError),
     EncodeCiphertext(bincode::Error),
+    EncodeMessage(std::string::FromUtf8Error),
 }
 
 impl std::fmt::Display for EncryptionError {
@@ -54,6 +60,12 @@ impl std::fmt::Display for EncryptionError {
 
 impl std::error::Error for EncryptionError {}
 
+/// Return the original message string from ciphertext as hexadecimal string.
+///
+/// # Todo:
+/// - When the message parameter in [`encrypt()`] generalizes to any type that
+///   implements `AsRef<[u8]>`, the returned type will be generic for all `T:
+///   AsRef<[u8]>`.
 pub fn decrypt(
     skde_params: &SkdeParams,
     ciphertext: &str,
@@ -68,7 +80,10 @@ pub fn decrypt(
         decrypt_inner(&mut message_bytes, skde_params, cipher_pair, decryption_key)?;
     }
 
-    Ok(const_hex::encode_prefixed(message_bytes))
+    let message_recovered =
+        String::from_utf8(message_bytes).map_err(DecryptionError::RecoverMessage)?;
+
+    Ok(message_recovered)
 }
 
 fn decrypt_inner(
@@ -96,7 +111,7 @@ pub enum DecryptionError {
     DecodeCiphertext(bincode::Error),
     NoModularInverseFound,
     WriteBytes(std::io::Error),
-    DecodeMessage(std::str::Utf8Error),
+    RecoverMessage(std::string::FromUtf8Error),
 }
 
 impl std::fmt::Display for DecryptionError {

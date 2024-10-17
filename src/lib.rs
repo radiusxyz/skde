@@ -138,4 +138,11 @@ mod tests {
             "Decrypted message is not the same with the original message"
         );
     }
+
+    #[test]
+    fn reps() {
+        for _ in 0..10 {
+            test_single_key_delay_encryption();
+        }
+    }
 }
