@@ -2,7 +2,7 @@ use std::io::Write;
 
 use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod};
 use num_bigint::{BigUint, RandBigInt};
-use num_traits::FromBytes;
+use num_traits::{FromBytes, Num};
 use rand::thread_rng;
 
 use crate::{
@@ -36,14 +36,21 @@ pub fn encrypt(
 }
 
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &PublicKey) -> CipherPair {
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
+    let pk = BigUint::from_str_radix(&encryption_key.pk, 10).unwrap();
+
     let plain_text = BigUint::from_be_bytes(slice);
     let mut rng = thread_rng();
-    let l: BigUint = rng.gen_biguint(skde_params.n.bits() / 2);
-    let pk_pow_l = big_pow_mod(&encryption_key.pk, &l, &skde_params.n);
-    let c1 = big_pow_mod(&skde_params.g, &l, &skde_params.n);
-    let c2 = big_mul_mod(&plain_text, &pk_pow_l, &skde_params.n);
+    let l: BigUint = rng.gen_biguint(n.bits() / 2);
+    let pk_pow_l = big_pow_mod(&pk, &l, &n);
+    let c1 = big_pow_mod(&g, &l, &n);
+    let c2 = big_mul_mod(&plain_text, &pk_pow_l, &n);
 
-    CipherPair { c1, c2 }
+    CipherPair {
+        c1: c1.to_str_radix(10),
+        c2: c2.to_str_radix(10),
+    }
 }
 
 #[derive(Debug)]
@@ -92,12 +99,18 @@ fn decrypt_inner(
     cipher_pair: &CipherPair,
     decryption_key: &SecretKey,
 ) -> Result<(), DecryptionError> {
-    let exponentiation = big_pow_mod(&cipher_pair.c1, &decryption_key.sk, &skde_params.n);
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
 
-    let inv_mod = big_mod_inv(&exponentiation, &skde_params.n)
-        .ok_or(DecryptionError::NoModularInverseFound)?;
+    let c1 = BigUint::from_str_radix(&cipher_pair.c1, 10).unwrap();
+    let c2 = BigUint::from_str_radix(&cipher_pair.c2, 10).unwrap();
 
-    let output = (cipher_pair.c2.clone() * inv_mod) % &skde_params.n;
+    let sk = BigUint::from_str_radix(&decryption_key.sk, 10).unwrap();
+
+    let exponentiation = big_pow_mod(&c1, &sk, &n);
+
+    let inv_mod = big_mod_inv(&exponentiation, &n).ok_or(DecryptionError::NoModularInverseFound)?;
+
+    let output = (c2.clone() * inv_mod) % &n;
     message_bytes
         .write(&output.to_bytes_be())
         .map_err(DecryptionError::WriteBytes)?;

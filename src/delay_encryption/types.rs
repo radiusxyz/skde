@@ -1,20 +1,19 @@
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PublicKey {
-    pub pk: BigUint,
+    pub pk: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SecretKey {
-    pub sk: BigUint,
+    pub sk: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct CipherPair {
-    pub c1: BigUint,
-    pub c2: BigUint,
+    pub c1: String,
+    pub c2: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -34,10 +33,10 @@ impl Ciphertext {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SkdeParams {
-    pub n: BigUint, // RSA modulus n = p * q
-    pub g: BigUint, // group generator
-    pub t: u32,     // delay parameter
-    pub h: BigUint, // g^{2^t} mod n
+    pub n: String, // RSA modulus n = p * q
+    pub g: String, // group generator
+    pub t: u32,    // delay parameter
+    pub h: String, // g^{2^t} mod n
 
-    pub max_sequencer_number: BigUint,
+    pub max_sequencer_number: String,
 }

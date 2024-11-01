@@ -28,11 +28,11 @@ pub fn setup(
     let h = mod_exp_by_pow_of_two(&g, t, &n);
 
     SkdeParams {
-        n,
-        g,
         t,
-        h,
-        max_sequencer_number,
+        n: n.to_str_radix(10),
+        g: g.to_str_radix(10),
+        h: h.to_str_radix(10),
+        max_sequencer_number: max_sequencer_number.to_str_radix(10),
     }
 }
 
@@ -60,7 +60,7 @@ mod tests {
         let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
 
         let skde_params = setup(time, p, q, g, max_sequencer_number);
-        let message: &str = "0xf869018203e882520894f17f52151ebef6c7334fad080c5704d77216b732881bc16d674ec80000801ba02da1c48b670996dcb1f447ef9ef00b33033c48a4fe";
+        let message: &str = "asdfasdfasdfasdf";
 
         // 1. Generate partial keys and proofs
         let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
@@ -112,7 +112,7 @@ mod tests {
         println!("Aggregation time: {:?}", aggregation_duration);
 
         let encryption_key = PublicKey {
-            pk: aggregated_key.u.clone(),
+            pk: aggregated_key.u.to_str_radix(10),
         };
 
         // 4. Encrypt the message

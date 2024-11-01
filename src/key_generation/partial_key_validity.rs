@@ -1,5 +1,6 @@
 use big_integer::{big_mul_mod, big_pow_mod, generate_random_biguint};
 use num_bigint::BigUint;
+use num_traits::Num;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
@@ -8,7 +9,7 @@ use super::{
     generate_uv_pair,
     types::{PartialKey, SecretValue},
 };
-use crate::{SkdeParams, MAX_SEQUENCER_NUMBER, BIT_LEN};
+use crate::{SkdeParams, BIT_LEN, MAX_SEQUENCER_NUMBER};
 
 #[derive(Debug, Clone)]
 pub struct UVPair {
@@ -29,22 +30,26 @@ pub fn prove_partial_key_validity(
     skde_params: &SkdeParams,
     secret_value: &SecretValue,
 ) -> PartialKeyProof {
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
+    let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
+    let t = BigUint::from(skde_params.t);
+
     let r = &secret_value.r;
     let s = &secret_value.s;
     let k = &secret_value.k;
-    let t = BigUint::from(skde_params.t);
     let bit_len_big = BigUint::from(BIT_LEN);
 
     let two_big = BigUint::from(2u32);
     let twice_bit_len_big = &two_big * bit_len_big;
-    let two_big_pow = &big_pow_mod(&two_big, &twice_bit_len_big, &skde_params.n);
+    let two_big_pow = &big_pow_mod(&two_big, &twice_bit_len_big, &n);
 
-    let n_half = &skde_params.n / &two_big;
-    let n_over_m = &skde_params.n / MAX_SEQUENCER_NUMBER; 
+    let n_half = &n / &two_big;
+    let n_over_m = &n / MAX_SEQUENCER_NUMBER;
     let n_half_plus_n_over_m = &n_half + &n_over_m;
 
-    let l_range = n_over_m * two_big_pow;
-    let x_range = n_half_plus_n_over_m * two_big_pow;
+    let l_range: BigUint = n_over_m * two_big_pow;
+    let x_range: BigUint = n_half_plus_n_over_m * two_big_pow;
 
     let l = generate_random_biguint(&l_range);
     let x = generate_random_biguint(&x_range);
@@ -54,18 +59,10 @@ pub fn prove_partial_key_validity(
     let a = ab_pair.u;
     let b = ab_pair.v;
 
-    let tau = big_pow_mod(&skde_params.g, &l, &skde_params.n);
+    let tau = big_pow_mod(&g, &l, &n);
 
     // Calculate SHA-512 hash
-    let transcript = vec![
-        &skde_params.n,
-        &skde_params.g,
-        &t,
-        &skde_params.h,
-        &a,
-        &b,
-        &tau,
-    ];
+    let transcript = vec![&n, &g, &t, &h, &a, &b, &tau];
 
     let e = calculate_challenge(&transcript);
 
@@ -86,8 +83,12 @@ pub fn verify_partial_key_validity(
     partial_key: PartialKey,
     partial_key_proof: PartialKeyProof,
 ) -> bool {
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
+    let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
+    let n_square: BigUint = &n * &n;
+
     let t = BigUint::from(skde_params.t);
-    let n_square: BigUint = &skde_params.n * &skde_params.n;
     let one_big = BigUint::from(1u32);
 
     let a = partial_key_proof.a;
@@ -102,37 +103,29 @@ pub fn verify_partial_key_validity(
     let w = &partial_key.w;
 
     // Calculate SHA-512 hash for the challenge
-    let transcript = vec![
-        &skde_params.n,
-        &skde_params.g,
-        &t,
-        &skde_params.h,
-        &a,
-        &b,
-        &tau,
-    ];
+    let transcript = vec![&n, &g, &t, &h, &a, &b, &tau];
     let e = calculate_challenge(&transcript);
 
-    let h_exp_nalpha = big_pow_mod(&skde_params.h, &(&alpha * &skde_params.n), &n_square);
-    let n_plus_one_exp_beta = big_pow_mod(&(&skde_params.n + &one_big), &beta, &n_square);
+    let h_exp_nalpha = big_pow_mod(&h, &(&alpha * &n), &n_square);
+    let n_plus_one_exp_beta = big_pow_mod(&(&n + &one_big), &beta, &n_square);
 
-    let uy = big_mul_mod(u, y, &skde_params.n);
+    let uy = big_mul_mod(u, y, &n);
     let vw = big_mul_mod(v, w, &n_square);
 
     // Parallel computation of lhs and rhs vectors
     let (lhs, rhs): (Vec<BigUint>, Vec<BigUint>) = rayon::join(
         || {
             vec![
-                big_pow_mod(&skde_params.g, &alpha, &skde_params.n),
+                big_pow_mod(&g, &alpha, &n),
                 big_mul_mod(&h_exp_nalpha, &n_plus_one_exp_beta, &n_square),
-                big_pow_mod(&skde_params.g, &beta, &skde_params.n),
+                big_pow_mod(&g, &beta, &n),
             ]
         },
         || {
             vec![
-                big_mul_mod(&big_pow_mod(&uy, &e, &skde_params.n), &a, &skde_params.n),
+                big_mul_mod(&big_pow_mod(&uy, &e, &n), &a, &n),
                 big_mul_mod(&big_pow_mod(&vw, &e, &n_square), &b, &n_square),
-                big_mul_mod(&big_pow_mod(u, &e, &skde_params.n), &tau, &skde_params.n),
+                big_mul_mod(&big_pow_mod(u, &e, &n), &tau, &n),
             ]
         },
     );

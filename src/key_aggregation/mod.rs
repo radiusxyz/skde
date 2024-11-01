@@ -11,7 +11,7 @@ use ff::PrimeField;
 use halo2wrong::halo2::{circuit::Value, plonk::Error};
 use maingate::RegionCtx;
 use num_bigint::BigUint;
-use num_traits::One;
+use num_traits::{Num, One};
 pub use types::*;
 
 use crate::{key_generation::PartialKey, SkdeParams};
@@ -55,7 +55,9 @@ pub fn aggregate_key(
     skde_params: &SkdeParams,
     partial_key_list: &Vec<PartialKey>,
 ) -> AggregatedKey {
-    let n_square = &skde_params.n * &skde_params.n;
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+
+    let n_square = &n * &n;
 
     let mut aggregated_u = BigUint::one();
     let mut aggregated_v = BigUint::one();
@@ -64,9 +66,9 @@ pub fn aggregate_key(
 
     // Multiply each component of each PartialKey in the array
     for partial_key in partial_key_list {
-        aggregated_u = big_mul_mod(&aggregated_u, &partial_key.u, &skde_params.n);
+        aggregated_u = big_mul_mod(&aggregated_u, &partial_key.u, &n);
         aggregated_v = big_mul_mod(&aggregated_v, &partial_key.v, &n_square);
-        aggregated_y = big_mul_mod(&aggregated_y, &partial_key.y, &skde_params.n);
+        aggregated_y = big_mul_mod(&aggregated_y, &partial_key.y, &n);
         aggregated_w = big_mul_mod(&aggregated_w, &partial_key.w, &n_square);
     }
 

@@ -6,17 +6,20 @@ use ff::PrimeField;
 use halo2wrong::halo2::plonk::Error;
 use maingate::RegionCtx;
 use num_bigint::BigUint;
-use num_traits::One;
+use num_traits::{Num, One};
 pub use partial_key_validity::*;
 pub use types::*;
 
 use crate::SkdeParams;
 
 pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKey) {
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+    let max_sequencer_number =
+        BigUint::from_str_radix(&skde_params.max_sequencer_number, 10).unwrap();
     let two_big: BigUint = BigUint::from(2u32);
 
-    let n_half: BigUint = &skde_params.n / two_big;
-    let n_half_over_m: BigUint = &n_half / skde_params.max_sequencer_number.clone();
+    let n_half: BigUint = &n / two_big;
+    let n_half_over_m: BigUint = &n_half / max_sequencer_number;
 
     let r = generate_random_biguint(&n_half_over_m);
     let s = generate_random_biguint(&n_half_over_m);
@@ -39,20 +42,20 @@ pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKe
 // Input: (a, b, skde_params = (n, g, t, h))
 // Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
 pub fn generate_uv_pair(skde_params: &SkdeParams, a: &BigUint, b: &BigUint) -> UVPair {
-    let n = &skde_params.n;
-    let g = &skde_params.g;
-    let h = &skde_params.h;
+    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
+    let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
 
     // let lambda = n.bits() / 2 + 1;
-    let n_square = n * n;
-    let n_plus_one = n + BigUint::one();
+    let n_square = &n * &n;
+    let n_plus_one = &n + BigUint::one();
 
     // U = g^r mod n
-    let u = big_pow_mod(g, a, n);
+    let u = big_pow_mod(&g, a, &n);
 
     // h_exp_r = h^r mod n, h_exp_rn = h^(r * n) mod n^2
-    let h_exp_a = big_pow_mod(h, a, n);
-    let h_exp_an = big_pow_mod(&h_exp_a, n, &n_square);
+    let h_exp_a = big_pow_mod(&h, a, &n);
+    let h_exp_an = big_pow_mod(&h_exp_a, &n, &n_square);
 
     // v = (n+1)^s * hrn mod n^2
     let v = (&big_pow_mod(&n_plus_one, b, &n_square) * &h_exp_an) % &n_square;
