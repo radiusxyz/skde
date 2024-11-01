@@ -2,16 +2,17 @@ use big_integer::{AssignedInteger, Fresh};
 use ff::PrimeField;
 use maingate::decompose_big;
 use num_bigint::BigUint;
+use num_traits::Num;
 use serde::{Deserialize, Serialize};
 
 use crate::key_generation::{AssignedPartialKey, UnassignedPartialKey};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AggregatedKey {
-    pub u: BigUint,
-    pub v: BigUint,
-    pub y: BigUint,
-    pub w: BigUint,
+    pub u: String,
+    pub v: String,
+    pub y: String,
+    pub w: String,
 }
 impl AggregatedKey {
     pub fn decompose_partial_key<F: PrimeField>(
@@ -19,11 +20,16 @@ impl AggregatedKey {
         limb_width: usize,
         limb_count: usize,
     ) -> DecomposedAggregatedKey<F> {
+        let u = BigUint::from_str_radix(&partial_key.u, 10).unwrap();
+        let v = BigUint::from_str_radix(&partial_key.v, 10).unwrap();
+        let y = BigUint::from_str_radix(&partial_key.y, 10).unwrap();
+        let w = BigUint::from_str_radix(&partial_key.w, 10).unwrap();
+
         DecomposedAggregatedKey {
-            u_limbs: decompose_big::<F>(partial_key.u.clone(), limb_count, limb_width),
-            v_limbs: decompose_big::<F>(partial_key.v.clone(), limb_count * 2, limb_width),
-            y_limbs: decompose_big::<F>(partial_key.y.clone(), limb_count, limb_width),
-            w_limbs: decompose_big::<F>(partial_key.w.clone(), limb_count * 2, limb_width),
+            u_limbs: decompose_big::<F>(u, limb_count, limb_width),
+            v_limbs: decompose_big::<F>(v, limb_count * 2, limb_width),
+            y_limbs: decompose_big::<F>(y, limb_count, limb_width),
+            w_limbs: decompose_big::<F>(w, limb_count * 2, limb_width),
         }
     }
 }

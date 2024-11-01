@@ -279,10 +279,10 @@ mod tests {
         let mut partial_key_list = vec![];
 
         let mut aggregated_key = AggregatedKey {
-            u: BigUint::one(),
-            v: BigUint::one(),
-            y: BigUint::one(),
-            w: BigUint::one(),
+            u: BigUint::one().to_str_radix(10),
+            v: BigUint::one().to_str_radix(10),
+            y: BigUint::one().to_str_radix(10),
+            w: BigUint::one().to_str_radix(10),
         };
 
         for _ in 0..max_sequencer_number {
@@ -298,10 +298,16 @@ mod tests {
                 w: w.clone(),
             });
 
-            aggregated_key.u = aggregated_key.u * &u % &n;
-            aggregated_key.v = aggregated_key.v * &v % &n_square;
-            aggregated_key.y = aggregated_key.y * &y % &n;
-            aggregated_key.w = aggregated_key.w * &w % &n_square;
+            aggregated_key.u = (BigUint::from_str_radix(&aggregated_key.u, 10).unwrap() * &u % &n)
+                .to_str_radix(10);
+            aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v, 10).unwrap() * &v
+                % &n_square)
+                .to_str_radix(10);
+            aggregated_key.y = (BigUint::from_str_radix(&aggregated_key.y, 10).unwrap() * &y % &n)
+                .to_str_radix(10);
+            aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w, 10).unwrap() * &w
+                % &n_square)
+                .to_str_radix(10);
         }
 
         let combined_partial_limbs: Vec<Fr> = PartialKey::decompose_and_combine_all_partial_keys(

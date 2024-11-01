@@ -74,10 +74,10 @@ pub fn aggregate_key(
 
     // Create a new AggregatedKey instance with the calculated results
     AggregatedKey {
-        u: aggregated_u,
-        v: aggregated_v,
-        y: aggregated_y,
-        w: aggregated_w,
+        u: aggregated_u.to_str_radix(10),
+        v: aggregated_v.to_str_radix(10),
+        y: aggregated_y.to_str_radix(10),
+        w: aggregated_w.to_str_radix(10),
     }
 }
 

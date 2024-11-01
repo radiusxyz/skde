@@ -112,7 +112,7 @@ mod tests {
         println!("Aggregation time: {:?}", aggregation_duration);
 
         let encryption_key = PublicKey {
-            pk: aggregated_key.u.to_str_radix(10),
+            pk: aggregated_key.u.clone(),
         };
 
         // 4. Encrypt the message

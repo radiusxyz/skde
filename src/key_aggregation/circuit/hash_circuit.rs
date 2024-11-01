@@ -389,10 +389,10 @@ mod tests {
         let mut partial_key_list = vec![];
 
         let mut aggregated_key = AggregatedKey {
-            u: BigUint::one(),
-            v: BigUint::one(),
-            y: BigUint::one(),
-            w: BigUint::one(),
+            u: BigUint::one().to_str_radix(10),
+            v: BigUint::one().to_str_radix(10),
+            y: BigUint::one().to_str_radix(10),
+            w: BigUint::one().to_str_radix(10),
         };
 
         for _ in 0..max_sequencer_number {
@@ -408,10 +408,16 @@ mod tests {
                 w: w.clone(),
             });
 
-            aggregated_key.u = aggregated_key.u * &u % &n;
-            aggregated_key.v = aggregated_key.v * &v % &n_square;
-            aggregated_key.y = aggregated_key.y * &y % &n;
-            aggregated_key.w = aggregated_key.w * &w % &n_square;
+            aggregated_key.u = (BigUint::from_str_radix(&aggregated_key.u, 10).unwrap() * &u % &n)
+                .to_str_radix(10);
+            aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v, 10).unwrap() * &v
+                % &n_square)
+                .to_str_radix(10);
+            aggregated_key.y = (BigUint::from_str_radix(&aggregated_key.y, 10).unwrap() * &y % &n)
+                .to_str_radix(10);
+            aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w, 10).unwrap() * &w
+                % &n_square)
+                .to_str_radix(10);
         }
 
         let mut ref_hasher = Poseidon::<Fr, 5, 4>::new_hash(8, 57);
@@ -498,25 +504,25 @@ mod tests {
 
         let mut public_inputs = vec![hash_list];
         public_inputs[0].extend(decompose_big::<Fr>(
-            aggregated_key.u.clone(),
+            BigUint::from_str_radix(&aggregated_key.u, 10).unwrap(),
             limb_count,
             bit_len,
         ));
 
         public_inputs[0].extend(decompose_big::<Fr>(
-            aggregated_key.v.clone(),
+            BigUint::from_str_radix(&aggregated_key.v, 10).unwrap(),
             limb_count * 2,
             bit_len,
         ));
 
         public_inputs[0].extend(decompose_big::<Fr>(
-            aggregated_key.y.clone(),
+            BigUint::from_str_radix(&aggregated_key.y, 10).unwrap(),
             limb_count,
             bit_len,
         ));
 
         public_inputs[0].extend(decompose_big::<Fr>(
-            aggregated_key.w.clone(),
+            BigUint::from_str_radix(&aggregated_key.w, 10).unwrap(),
             limb_count * 2,
             bit_len,
         ));

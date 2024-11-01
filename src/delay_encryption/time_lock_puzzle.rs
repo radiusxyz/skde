@@ -12,13 +12,19 @@ pub fn solve_time_lock_puzzle(
     aggregated_key: &AggregatedKey,
 ) -> io::Result<SecretKey> {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
+
+    let u = BigUint::from_str_radix(&aggregated_key.u, 10).unwrap();
+    let y = BigUint::from_str_radix(&aggregated_key.y, 10).unwrap();
+    let v = BigUint::from_str_radix(&aggregated_key.v, 10).unwrap();
+    let w = BigUint::from_str_radix(&aggregated_key.w, 10).unwrap();
+
     let time: BigUint = BigUint::from(2u32).pow(skde_params.t);
 
     let one_big = BigUint::one();
     let n_square: BigUint = &n * &n;
 
-    let u_p = big_mul_mod(&aggregated_key.u, &aggregated_key.y, &n);
-    let v_p = big_mul_mod(&aggregated_key.v, &aggregated_key.w, &n_square);
+    let u_p = big_mul_mod(&u, &y, &n);
+    let v_p = big_mul_mod(&v, &w, &n_square);
 
     let x = big_pow_mod(&u_p, &time, &n);
     let x_pow_n = big_pow_mod(&x, &n, &n_square);
