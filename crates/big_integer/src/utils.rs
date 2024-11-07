@@ -1,12 +1,11 @@
-use num_bigint::RandBigInt;
-use num_bigint::{BigInt, BigUint, ToBigInt};
+use num_bigint::{BigInt, BigUint, RandBigInt, ToBigInt};
 use num_traits::{One, Zero};
 use rand::thread_rng;
 
 pub fn generate_random_biguint(modulus: &BigUint) -> BigUint {
     let mut rng = thread_rng();
     let random_biguint = rng.gen_biguint_below(modulus);
-    println!("Generated random BigUint: {:?}", random_biguint); // 랜덤 BigUint 값 출력
+
     random_biguint
 }
 

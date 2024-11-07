@@ -6,7 +6,7 @@ use num_traits::{FromBytes, Num};
 use rand::thread_rng;
 
 use crate::{
-    delay_encryption::{CipherPair, Ciphertext, PublicKey, SecretKey},
+    delay_encryption::{CipherPair, Ciphertext},
     SkdeParams,
 };
 
@@ -21,7 +21,7 @@ const CHUNK_SIZE: usize = 64;
 pub fn encrypt(
     skde_params: &SkdeParams,
     message: &str,
-    encryption_key: &PublicKey,
+    encryption_key: &str,
 ) -> Result<String, EncryptionError> {
     let cipher_pair_list: Vec<CipherPair> = message
         .as_bytes()
@@ -35,10 +35,10 @@ pub fn encrypt(
     Ok(encrypted_message)
 }
 
-fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &PublicKey) -> CipherPair {
+fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -> CipherPair {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
-    let pk = BigUint::from_str_radix(&encryption_key.pk, 10).unwrap();
+    let pk = BigUint::from_str_radix(&encryption_key, 10).unwrap();
 
     let plain_text = BigUint::from_be_bytes(slice);
     let mut rng = thread_rng();
@@ -76,7 +76,7 @@ impl std::error::Error for EncryptionError {}
 pub fn decrypt(
     skde_params: &SkdeParams,
     ciphertext: &str,
-    decryption_key: &SecretKey,
+    decryption_key: &str,
 ) -> Result<String, DecryptionError> {
     let bytes = const_hex::decode(ciphertext).map_err(DecryptionError::DecodeHexString)?;
     let ciphertext =
@@ -97,14 +97,14 @@ fn decrypt_inner(
     message_bytes: &mut Vec<u8>,
     skde_params: &SkdeParams,
     cipher_pair: &CipherPair,
-    decryption_key: &SecretKey,
+    decryption_key: &str,
 ) -> Result<(), DecryptionError> {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
 
     let c1 = BigUint::from_str_radix(&cipher_pair.c1, 10).unwrap();
     let c2 = BigUint::from_str_radix(&cipher_pair.c2, 10).unwrap();
 
-    let sk = BigUint::from_str_radix(&decryption_key.sk, 10).unwrap();
+    let sk = BigUint::from_str_radix(&decryption_key, 10).unwrap();
 
     let exponentiation = big_pow_mod(&c1, &sk, &n);
 

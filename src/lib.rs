@@ -43,7 +43,7 @@ mod tests {
     use num_bigint::BigUint;
 
     use crate::{
-        delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle, PublicKey},
+        delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle},
         key_aggregation::aggregate_key,
         key_generation::{
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
@@ -79,6 +79,13 @@ mod tests {
             })
             .collect();
 
+        println!("Generated {} keys", MAX_SEQUENCER_NUMBER);
+        generated_keys_and_proofs
+            .iter()
+            .for_each(|(partial_key, _)| {
+                println!("Partial key: {:?}", partial_key);
+            });
+
         // 2. Verify all generated keys
         let verification_start = Instant::now();
         generated_keys_and_proofs
@@ -111,9 +118,9 @@ mod tests {
         let aggregation_duration = aggregation_start.elapsed();
         println!("Aggregation time: {:?}", aggregation_duration);
 
-        let encryption_key = PublicKey {
-            pk: aggregated_key.u.clone(),
-        };
+        let encryption_key = aggregated_key.u.clone();
+
+        println!("Encryption key: {:?}", encryption_key);
 
         // 4. Encrypt the message
         let encryption_start = Instant::now();
@@ -129,7 +136,7 @@ mod tests {
 
         // 6. Decrypt the cipher text
         let decryption_start = Instant::now();
-        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key).unwrap();
+        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key.sk).unwrap();
         let decryption_duration = decryption_start.elapsed();
         println!("Decryption time: {:?}", decryption_duration);
 
