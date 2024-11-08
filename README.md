@@ -71,7 +71,7 @@ This SKDE includes parameters for cryptographic configurations, such as bit leng
 These constants define the environment and security parameters for delay encryption and key aggregation circuit.
 
 ## Contributing
-We appreciate your contributions to our project. To get involved, refer to [Contributing Guide](https://github.com/radiusxyz/radius-docs-bbs/blob/main/contributing_guide.md).
+We appreciate your contributions to our project. Visit [issues](https://github.com/radiusxyz/skde/issues) page to start with or refer to the [Contributing guide](https://github.com/radiusxyz/radius-docs-bbs/blob/main/docs/contributing_guide.md).
 
 ## Getting Help
 If you cannot find answers from our Guides(WIP) and Documentation(WIP), refer to [Getting Help](https://github.com/radiusxyz/radius-docs-bbs/blob/main/getting_help.md).
