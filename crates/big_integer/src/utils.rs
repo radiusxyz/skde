@@ -4,9 +4,7 @@ use rand::thread_rng;
 
 pub fn generate_random_biguint(modulus: &BigUint) -> BigUint {
     let mut rng = thread_rng();
-    let random_biguint = rng.gen_biguint_below(modulus);
-
-    random_biguint
+    rng.gen_biguint_below(modulus)
 }
 
 // compute big integer g^t mod n

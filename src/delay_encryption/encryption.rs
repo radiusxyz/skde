@@ -38,7 +38,7 @@ pub fn encrypt(
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -> CipherPair {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
-    let pk = BigUint::from_str_radix(&encryption_key, 10).unwrap();
+    let pk = BigUint::from_str_radix(encryption_key, 10).unwrap();
 
     let plain_text = BigUint::from_be_bytes(slice);
     let mut rng = thread_rng();
@@ -104,7 +104,7 @@ fn decrypt_inner(
     let c1 = BigUint::from_str_radix(&cipher_pair.c1, 10).unwrap();
     let c2 = BigUint::from_str_radix(&cipher_pair.c2, 10).unwrap();
 
-    let sk = BigUint::from_str_radix(&decryption_key, 10).unwrap();
+    let sk = BigUint::from_str_radix(decryption_key, 10).unwrap();
 
     let exponentiation = big_pow_mod(&c1, &sk, &n);
 

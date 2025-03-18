@@ -237,15 +237,15 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         }
         let range_chip = self.range_chip();
         // Assert that the new limb values fit in `self.limb_widt` bits.
-        for i in 0..num_limbs_fresh {
-            let limb_val = refreshed_limbs[i].value().map(|f| *f);
-            let range_assigned = range_chip.assign(
-                ctx,
-                limb_val,
-                Self::sublimb_bit_len(self.limb_width),
-                self.limb_width,
-            )?;
-            main_gate.assert_equal(ctx, &refreshed_limbs[i], &range_assigned)?;
+        let sublimb_bit_len = Self::sublimb_bit_len(self.limb_width);
+
+        for refreshed_limb in refreshed_limbs.iter() {
+            let limb_val = refreshed_limb.value().copied();
+
+            let range_assigned =
+                range_chip.assign(ctx, limb_val, sublimb_bit_len, self.limb_width)?;
+
+            main_gate.assert_equal(ctx, refreshed_limb, &range_assigned)?;
         }
         let refreshed_limbs = refreshed_limbs
             .into_iter()
@@ -511,9 +511,11 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
                     .select(ctx, &added.limb(i), &subed.limb(i), &is_overflowed)?;
             res_limbs.push(AssignedLimb::<_, Fresh>::from(val));
         }
-        for i in n.num_limbs()..num_limbs {
-            self.main_gate()
-                .assert_zero(ctx, &res_limbs[i].assigned_val())?;
+        let main_gate = self.main_gate(); // Avoid redundant function calls
+
+        for res_limb in res_limbs.iter().skip(n.num_limbs()) {
+            let assigned_val = res_limb.assigned_val(); // Avoid redundant access
+            main_gate.assert_zero(ctx, &assigned_val)?;
         }
         let res = AssignedInteger::new(&res_limbs[0..n.num_limbs()]);
         Ok(res)
@@ -561,9 +563,11 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
                     .select(ctx, &subed2.limb(i), &subed1.limb(i), &is_overflowed1)?;
             res_limbs.push(AssignedLimb::<_, Fresh>::from(val));
         }
-        for i in n.num_limbs()..num_limbs {
-            self.main_gate()
-                .assert_zero(ctx, &res_limbs[i].assigned_val())?;
+        let main_gate = self.main_gate(); // Avoid redundant calls
+
+        for res_limb in res_limbs.iter().skip(n.num_limbs()) {
+            let assigned_val = res_limb.assigned_val();
+            main_gate.assert_zero(ctx, &assigned_val)?;
         }
         let res = AssignedInteger::new(&res_limbs[0..n.num_limbs()]);
         Ok(res)
