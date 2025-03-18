@@ -1,7 +1,8 @@
-use crate::{AssignedInteger, Fresh, Muled, RefreshAux, UnassignedInteger};
 use halo2wrong::halo2::{arithmetic::Field, plonk::Error};
 use maingate::{AssignedValue, RegionCtx};
 use num_bigint::BigUint;
+
+use crate::{AssignedInteger, Fresh, Muled, RefreshAux, UnassignedInteger};
 
 /// Instructions for big-integer operations.
 pub trait BigIntInstructions<F: Field> {
@@ -74,7 +75,8 @@ pub trait BigIntInstructions<F: Field> {
         a: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Muled>, Error>;
 
-    /// Given two inputs `a,b` and a modulus `n`, performs the modular addition `a + b mod n`.
+    /// Given two inputs `a,b` and a modulus `n`, performs the modular addition
+    /// `a + b mod n`.
     fn add_mod(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -83,7 +85,8 @@ pub trait BigIntInstructions<F: Field> {
         n: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Fresh>, Error>;
 
-    /// Given two inputs `a,b` and a modulus `n`, performs the modular subtraction `a - b mod n`.
+    /// Given two inputs `a,b` and a modulus `n`, performs the modular
+    /// subtraction `a - b mod n`.
     fn sub_mod(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -92,7 +95,8 @@ pub trait BigIntInstructions<F: Field> {
         n: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Fresh>, Error>;
 
-    /// Given two inputs `a,b` and a modulus `n`, performs the modular multiplication `a * b mod n`.
+    /// Given two inputs `a,b` and a modulus `n`, performs the modular
+    /// multiplication `a * b mod n`.
     fn mul_mod(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -101,7 +105,8 @@ pub trait BigIntInstructions<F: Field> {
         n: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Fresh>, Error>;
 
-    /// Given a input `a` and a modulus `n`, performs the modular square `a^2 mod n`.
+    /// Given a input `a` and a modulus `n`, performs the modular square `a^2
+    /// mod n`.
     fn square_mod(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -109,7 +114,8 @@ pub trait BigIntInstructions<F: Field> {
         n: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Fresh>, Error>;
 
-    /// Given a base `a`, a variable exponent `e`, and a modulus `n`, performs the modular power `a^e mod n`.
+    /// Given a base `a`, a variable exponent `e`, and a modulus `n`, performs
+    /// the modular power `a^e mod n`.
     fn pow_mod(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -119,7 +125,8 @@ pub trait BigIntInstructions<F: Field> {
         exp_limb_bits: usize,
     ) -> Result<AssignedInteger<F, Fresh>, Error>;
 
-    /// Given a base `a`, a fixed exponent `e`, and a modulus `n`, performs the modular power `a^e mod n`.
+    /// Given a base `a`, a fixed exponent `e`, and a modulus `n`, performs the
+    /// modular power `a^e mod n`.
     fn pow_mod_fixed_exp(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -135,7 +142,8 @@ pub trait BigIntInstructions<F: Field> {
         a: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` and `b` are equivalent, whose [`RangeType`] is [`Fresh`].
+    /// Returns an assigned bit representing whether `a` and `b` are equivalent,
+    /// whose [`RangeType`] is [`Fresh`].
     fn is_equal_fresh(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -143,7 +151,8 @@ pub trait BigIntInstructions<F: Field> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` and `b` are equivalent, whose [`RangeType`] is [`Muled`].
+    /// Returns an assigned bit representing whether `a` and `b` are equivalent,
+    /// whose [`RangeType`] is [`Muled`].
     fn is_equal_muled(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -153,7 +162,8 @@ pub trait BigIntInstructions<F: Field> {
         num_limbs_r: usize,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` is less than `b` (`a<b`).
+    /// Returns an assigned bit representing whether `a` is less than `b`
+    /// (`a<b`).
     fn is_less_than(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -161,7 +171,8 @@ pub trait BigIntInstructions<F: Field> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` is less than or equal to `b` (`a<=b`).
+    /// Returns an assigned bit representing whether `a` is less than or equal
+    /// to `b` (`a<=b`).
     fn is_less_than_or_equal(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -169,7 +180,8 @@ pub trait BigIntInstructions<F: Field> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` is greater than `b` (`a>b`).
+    /// Returns an assigned bit representing whether `a` is greater than `b`
+    /// (`a>b`).
     fn is_greater_than(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -177,7 +189,8 @@ pub trait BigIntInstructions<F: Field> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` is greater than or equal to `b` (`a>=b`).
+    /// Returns an assigned bit representing whether `a` is greater than or
+    /// equal to `b` (`a>=b`).
     fn is_greater_than_or_equal(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -185,7 +198,8 @@ pub trait BigIntInstructions<F: Field> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error>;
 
-    /// Returns an assigned bit representing whether `a` is in the order-`n` finite field.
+    /// Returns an assigned bit representing whether `a` is in the order-`n`
+    /// finite field.
     fn is_in_field(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -200,7 +214,8 @@ pub trait BigIntInstructions<F: Field> {
         a: &AssignedInteger<F, Fresh>,
     ) -> Result<(), Error>;
 
-    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is [`Fresh`].
+    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is
+    /// [`Fresh`].
     fn assert_equal_fresh(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -208,7 +223,8 @@ pub trait BigIntInstructions<F: Field> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<(), Error>;
 
-    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is [`Muled`].
+    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is
+    /// [`Muled`].
     fn assert_equal_muled(
         &self,
         ctx: &mut RegionCtx<'_, F>,

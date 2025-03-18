@@ -1,6 +1,8 @@
-use crate::{grain::Grain, matrix::Matrix};
-use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
 use std::ops::Index;
+
+use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
+
+use crate::{grain::Grain, matrix::Matrix};
 
 /// `State` is structure `T` sized field elements that are subjected to
 /// permutation
@@ -395,8 +397,10 @@ impl<F: FromUniformBytes<64>, const T: usize, const RATE: usize> Spec<F, T, RATE
 
 #[cfg(test)]
 pub(super) mod tests {
-    use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
-    use halo2wrong::halo2::halo2curves::serde::SerdeObject;
+    use halo2wrong::halo2::halo2curves::{
+        group::ff::{FromUniformBytes, PrimeField},
+        serde::SerdeObject,
+    };
 
     use super::MDSMatrix;
     use crate::grain::Grain;

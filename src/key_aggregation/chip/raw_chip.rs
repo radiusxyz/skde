@@ -1,7 +1,9 @@
-use crate::key_aggregation::AggregateRawConfig;
+use std::marker::PhantomData;
+
 use big_integer::BigIntChip;
 use ff::PrimeField;
-use std::marker::PhantomData;
+
+use crate::key_aggregation::AggregateRawConfig;
 
 #[derive(Debug, Clone)]
 pub struct KeyAggregationRawChip<F: PrimeField> {

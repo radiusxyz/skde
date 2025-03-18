@@ -1,6 +1,5 @@
 use ff::FromUniformBytes;
-use halo2wrong::halo2::halo2curves::ff::PrimeField;
-use halo2wrong::halo2::{circuit::AssignedCell, plonk::Error};
+use halo2wrong::halo2::{circuit::AssignedCell, halo2curves::ff::PrimeField, plonk::Error};
 use maingate::{AssignedValue, MainGateConfig, RegionCtx};
 use poseidon::{PoseidonChip, Spec};
 
@@ -84,16 +83,16 @@ impl<
 #[cfg(test)]
 mod tests {
     use ff::FromUniformBytes;
-    use halo2wrong::halo2::circuit::AssignedCell;
-    use halo2wrong::halo2::circuit::{Layouter, SimpleFloorPlanner, Value};
-    use halo2wrong::halo2::halo2curves::ff::{Field, PrimeField};
-    use halo2wrong::halo2::plonk::Error;
-    use halo2wrong::halo2::plonk::{Circuit, ConstraintSystem};
-    use maingate::mock_prover_verify;
-    use maingate::{MainGate, MainGateConfig, MainGateInstructions, RegionCtx};
-    use poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
-    use poseidon::Poseidon;
-    use poseidon::Spec;
+    use halo2wrong::halo2::{
+        circuit::{AssignedCell, Layouter, SimpleFloorPlanner, Value},
+        halo2curves::ff::{Field, PrimeField},
+        plonk::{Circuit, ConstraintSystem, Error},
+    };
+    use maingate::{mock_prover_verify, MainGate, MainGateConfig, MainGateInstructions, RegionCtx};
+    use poseidon::{
+        chip::{FULL_ROUND, PARTIAL_ROUND},
+        Poseidon, Spec,
+    };
 
     use super::HasherChip;
 

@@ -66,10 +66,6 @@ doctest = false
 bench = false
 
 [[bench]]
-name = "aggregate"
-harness = false
-
-[[bench]]
 name = "aggregate_with_hash"
 harness = false
 

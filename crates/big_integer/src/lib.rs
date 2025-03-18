@@ -4,31 +4,34 @@ mod utils;
 use std::marker::PhantomData;
 
 pub use chip::*;
-pub use instructions::*;
-pub use utils::*;
-
 //zeroknight
 use ff::PrimeField;
-
 use halo2wrong::halo2::{arithmetic::Field, circuit::Value};
+pub use instructions::*;
 use maingate::{fe_to_big, AssignedValue};
 use num_bigint::BigUint;
+pub use utils::*;
 
 /// Trait for types representing a range of the limb.
 pub trait RangeType: Clone {}
 
-/// [`RangeType`] assigned to [`AssignedLimb`] and [`AssignedInteger`] that are not multiplied yet.
+/// [`RangeType`] assigned to [`AssignedLimb`] and [`AssignedInteger`] that are
+/// not multiplied yet.
 ///
-/// The maximum value of the [`Fresh`] type limb is defined in the chip implementing [`BigIntInstructions`] trait.
-/// For example, [`BigIntChip`] has an `limb_width` parameter and limits the size of the [`Fresh`] type limb to be less than `2^(limb_width)`.
+/// The maximum value of the [`Fresh`] type limb is defined in the chip
+/// implementing [`BigIntInstructions`] trait. For example, [`BigIntChip`] has
+/// an `limb_width` parameter and limits the size of the [`Fresh`] type limb to
+/// be less than `2^(limb_width)`.
 #[derive(Debug, Clone)]
 pub struct Fresh {}
 impl RangeType for Fresh {}
 
-/// [`RangeType`] assigned to [`AssignedLimb`] and [`AssignedInteger`] that are already multiplied.
+/// [`RangeType`] assigned to [`AssignedLimb`] and [`AssignedInteger`] that are
+/// already multiplied.
 ///
-/// The value of the [`Muled`] type limb may overflow the maximum value of the [`Fresh`] type limb.
-/// You can convert the [`Muled`] type integer to the [`Fresh`] type integer by calling [`BigIntInstructions::refresh`] function.
+/// The value of the [`Muled`] type limb may overflow the maximum value of the
+/// [`Fresh`] type limb. You can convert the [`Muled`] type integer to the
+/// [`Fresh`] type integer by calling [`BigIntInstructions::refresh`] function.
 #[derive(Debug, Clone)]
 pub struct Muled {}
 impl RangeType for Muled {}
@@ -169,7 +172,8 @@ impl<F: PrimeField, T: RangeType> AssignedInteger<F, T> {
         self.0[idx] = limb;
     }
 
-    /// Increases the number of the limbs by adding the given [`AssignedValue<F>`] representing zero.
+    /// Increases the number of the limbs by adding the given
+    /// [`AssignedValue<F>`] representing zero.
     ///
     /// # Arguments
     /// * num_extend_limbs - the number of limbs to add.
@@ -190,8 +194,9 @@ impl<F: PrimeField> AssignedInteger<F, Fresh> {
     /// * zero_limb - an assigned limb representing zero.
     ///
     /// # Return values
-    /// Returns the converted integer whose type is [`AssignedInteger<F, Muled>`].
-    /// The number of limbs of the converted integer increases to `2 * num_limb - 1`.
+    /// Returns the converted integer whose type is [`AssignedInteger<F,
+    /// Muled>`]. The number of limbs of the converted integer increases to
+    /// `2 * num_limb - 1`.
     pub fn to_muled(&self, zero_limb: AssignedLimb<F, Muled>) -> AssignedInteger<F, Muled> {
         let num_limb = self.num_limbs();
         let mut limbs = self
@@ -206,7 +211,8 @@ impl<F: PrimeField> AssignedInteger<F, Fresh> {
     }
 }
 
-/// Auxiliary data for refreshing a [`Muled`] type integer to a [`Fresh`] type integer.
+/// Auxiliary data for refreshing a [`Muled`] type integer to a [`Fresh`] type
+/// integer.
 #[derive(Debug, Clone)]
 pub struct RefreshAux {
     limb_width: usize,
@@ -216,14 +222,17 @@ pub struct RefreshAux {
 }
 
 impl RefreshAux {
-    /// Creates a new [`RefreshAux`] corresponding to `num_limbs_l` and `num_limbs_r`.
+    /// Creates a new [`RefreshAux`] corresponding to `num_limbs_l` and
+    /// `num_limbs_r`.
     ///
     /// # Arguments
     /// * `limb_width` - bit length of the limb.
     /// * `num_limbs_l` - a parameter to specify the number of limbs.
     /// * `num_limbs_r` - a parameter to specify the number of limbs.
     ///
-    /// If `a` (`b`) is the product of integers `l` and `r`, you must specify the lengths of the limbs of integers `l` and `r` as `num_limbs_l` and `num_limbs_l`, respectively.
+    /// If `a` (`b`) is the product of integers `l` and `r`, you must specify
+    /// the lengths of the limbs of integers `l` and `r` as `num_limbs_l` and
+    /// `num_limbs_l`, respectively.
     ///
     /// # Return values
     /// Returns a new [`RefreshAux`].
@@ -285,8 +294,9 @@ impl RefreshAux {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use rand::{thread_rng, Rng};
+
+    use super::*;
 
     #[test]
     fn test_debug_and_clone_traits() {

@@ -51,10 +51,10 @@ impl<F: PrimeField, const T: usize, const RATE: usize> Spec<F, T, RATE> {
 
 #[cfg(test)]
 mod tests {
+    use halo2wrong::halo2::halo2curves::{bn256::Fr, group::ff::PrimeField};
+
     use super::State;
     use crate::spec::{tests::SpecRef, Spec};
-    use halo2wrong::halo2::halo2curves::bn256::Fr;
-    use halo2wrong::halo2::halo2curves::group::ff::PrimeField;
 
     /// We want to keep non-optimized poseidon construction and permutation to
     /// cross test with optimized one
@@ -84,9 +84,10 @@ mod tests {
 
     #[test]
     fn cross_test() {
+        use std::time::Instant;
+
         use halo2wrong::halo2::halo2curves::group::ff::Field;
         use rand_core::OsRng;
-        use std::time::Instant;
 
         macro_rules! run_test {
             (

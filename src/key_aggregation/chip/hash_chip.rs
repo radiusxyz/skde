@@ -1,13 +1,16 @@
-use crate::key_aggregation::AggregateHashConfig;
+use std::marker::PhantomData;
 
 use big_integer::BigIntChip;
 use ff::{FromUniformBytes, PrimeField};
 use halo2wrong::halo2::plonk::Error;
 use hash::HasherChip;
 use maingate::{MainGateConfig, RegionCtx};
-use poseidon::chip::{FULL_ROUND, PARTIAL_ROUND};
-use poseidon::{PoseidonChip, Spec};
-use std::marker::PhantomData;
+use poseidon::{
+    chip::{FULL_ROUND, PARTIAL_ROUND},
+    PoseidonChip, Spec,
+};
+
+use crate::key_aggregation::AggregateHashConfig;
 
 /// Chip for [`AggregateWithHashInstructions`].
 #[derive(Debug, Clone)]

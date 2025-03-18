@@ -1,40 +1,43 @@
-use halo2wrong::curves::bn256::Fr;
-use halo2wrong::halo2::halo2curves::bn256::{Bn256, G1Affine};
-
-use halo2wrong::halo2::{
-    plonk::*,
-    poly::{commitment::Params, VerificationStrategy},
-    poly::{
-        commitment::ParamsProver,
-        kzg::{
-            commitment::{KZGCommitmentScheme, ParamsKZG},
-            multiopen::{ProverGWC, VerifierGWC},
-            strategy::AccumulatorStrategy,
-        },
-    },
-    transcript::{Blake2bRead, Blake2bWrite, Challenge255},
-    transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
-    SerdeFormat,
-};
-use maingate::{big_to_fe, decompose_big};
-
-use num_bigint::{BigUint, RandomBits};
-use num_traits::One;
-use poseidon::{Poseidon, Spec};
-use rand::{thread_rng, Rng};
-use rand_core::OsRng;
-use skde::key_aggregation::{AggregateHashCircuit, AggregatedKey};
-use skde::key_generation::PartialKey;
-use skde::MAX_SEQUENCER_NUMBER;
-
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufReader, Read, Write},
     marker::PhantomData,
     path::Path,
 };
+
 // bench-mark tool
 use criterion::Criterion;
+use halo2wrong::{
+    curves::bn256::Fr,
+    halo2::{
+        halo2curves::bn256::{Bn256, G1Affine},
+        plonk::*,
+        poly::{
+            commitment::{Params, ParamsProver},
+            kzg::{
+                commitment::{KZGCommitmentScheme, ParamsKZG},
+                multiopen::{ProverGWC, VerifierGWC},
+                strategy::AccumulatorStrategy,
+            },
+            VerificationStrategy,
+        },
+        transcript::{
+            Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
+        },
+        SerdeFormat,
+    },
+};
+use maingate::{big_to_fe, decompose_big};
+use num_bigint::{BigUint, RandomBits};
+use num_traits::One;
+use poseidon::{Poseidon, Spec};
+use rand::{thread_rng, Rng};
+use rand_core::OsRng;
+use skde::{
+    key_aggregation::{AggregateHashCircuit, AggregatedKey},
+    key_generation::PartialKey,
+    MAX_SEQUENCER_NUMBER,
+};
 pub const DEGREE: u32 = 21;
 
 // Create the file and directory if it does not exist
@@ -92,10 +95,10 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
     let mut partial_key_list = vec![];
 
     let mut aggregated_key = AggregatedKey {
-        u: BigUint::one(),
-        v: BigUint::one(),
-        y: BigUint::one(),
-        w: BigUint::one(),
+        u: BigUint::one().to_str_radix(10),
+        v: BigUint::one().to_str_radix(10),
+        y: BigUint::one().to_str_radix(10),
+        w: BigUint::one().to_str_radix(10),
     };
 
     for _ in 0..max_sequencer_number {
@@ -111,10 +114,16 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
             w: w.clone(),
         });
 
-        aggregated_key.u = aggregated_key.u * &u % &n;
-        aggregated_key.v = aggregated_key.v * &v % &n_square;
-        aggregated_key.y = aggregated_key.y * &y % &n;
-        aggregated_key.w = aggregated_key.w * &w % &n_square;
+        aggregated_key.u =
+            (BigUint::from_str_radix(&aggregated_key.u, 10).unwrap() * &u % &n).to_str_radix(10);
+        aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v, 10).unwrap() * &v
+            % &n_square)
+            .to_str_radix(10);
+        aggregated_key.y =
+            (BigUint::from_str_radix(&aggregated_key.y, 10).unwrap() * &y % &n).to_str_radix(10);
+        aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w, 10).unwrap() * &w
+            % &n_square)
+            .to_str_radix(10);
     }
 
     let mut ref_hasher = Poseidon::<Fr, 5, 4>::new_hash(8, 57);

@@ -1,5 +1,6 @@
-use crate::spec::{Spec, State};
 use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
+
+use crate::spec::{Spec, State};
 
 /// output when desired
 #[derive(Debug, Clone)]
