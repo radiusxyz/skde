@@ -29,7 +29,7 @@ use halo2wrong::{
 };
 use maingate::{big_to_fe, decompose_big};
 use num_bigint::{BigUint, RandomBits};
-use num_traits::One;
+use num_traits::{Num, One};
 use poseidon::{Poseidon, Spec};
 use rand::{thread_rng, Rng};
 use rand_core::OsRng;
@@ -205,25 +205,24 @@ fn bench_aggregate_with_hash<const K: u32>(name: &str, c: &mut Criterion) {
         max_sequencer_number,
         _f: PhantomData,
     };
-
     let mut public_inputs = vec![hash_list];
     public_inputs[0].extend(decompose_big::<Fr>(
-        aggregated_key.u.clone(),
+        BigUint::from_str_radix(&aggregated_key.u.clone(), 10).unwrap(),
         limb_count,
         limb_width,
     ));
     public_inputs[0].extend(decompose_big::<Fr>(
-        aggregated_key.v.clone(),
+        BigUint::from_str_radix(&aggregated_key.v.clone(), 10).unwrap(),
         limb_count * 2,
         limb_width,
     ));
     public_inputs[0].extend(decompose_big::<Fr>(
-        aggregated_key.y.clone(),
+        BigUint::from_str_radix(&aggregated_key.y.clone(), 10).unwrap(),
         limb_count,
         limb_width,
     ));
     public_inputs[0].extend(decompose_big::<Fr>(
-        aggregated_key.w.clone(),
+        BigUint::from_str_radix(&aggregated_key.w.clone(), 10).unwrap(),
         limb_count * 2,
         limb_width,
     ));
