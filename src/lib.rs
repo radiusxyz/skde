@@ -3,27 +3,35 @@ use big_integer::mod_exp_by_pow_of_two;
 use delay_encryption::SkdeParams;
 pub use num_bigint::BigUint;
 
+pub use num_prime::RandPrime;
+
 pub mod delay_encryption;
 pub mod key_aggregation;
 pub mod key_generation;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
 pub const BIT_LEN: usize = 2048; // n's bit length
+
 pub const LIMB_WIDTH: usize = 64;
 pub const LIMB_COUNT: usize = BIT_LEN / LIMB_WIDTH;
 
-pub const PRIME_P: &str = "8155133734070055735139271277173718200941522166153710213522626777763679009805792017274916613411023848268056376687809186180768200590914945958831360737612803";
-pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
+// pub const PRIME_P: &str = "8155133734070055735139271277173718200941522166153710213522626777763679009805792017274916613411023848268056376687809186180768200590914945958831360737612803";
+// pub const PRIME_Q: &str = "13379153270147861840625872456862185586039997603014979833900847304743997773803109864546170215161716700184487787472783869920830925415022501258643369350348243";
 pub const GENERATOR: &str = "4";
 pub const TIME_PARAM_T: u32 = 2; // delay time depends on: 2^TIME_PARMA_T
 
 pub fn setup(
     t: u32,
-    p: BigUint,
-    q: BigUint,
+    // p: BigUint,
+    // q: BigUint,
     g: BigUint,
     max_sequencer_number: BigUint,
 ) -> SkdeParams {
+    let mut rng = rand::thread_rng();
+
+    let p: BigUint = rng.gen_safe_prime_exact(BIT_LEN / 2);
+    let q: BigUint = rng.gen_safe_prime_exact(BIT_LEN / 2);
+
     let n = p * q;
     let h = mod_exp_by_pow_of_two(&g, t, &n);
 
@@ -48,21 +56,32 @@ mod tests {
         key_generation::{
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
         },
-        setup, GENERATOR, MAX_SEQUENCER_NUMBER, PRIME_P, PRIME_Q, TIME_PARAM_T,
+        setup, BIT_LEN,
     };
+
+    use crate::{GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T};
 
     #[test]
     fn test_single_key_delay_encryption() {
         let time = 2_u32.pow(TIME_PARAM_T);
-        let p = BigUint::from_str(PRIME_P).expect("Invalid PRIME_P");
-        let q = BigUint::from_str(PRIME_Q).expect("Invalid PRIME_Q");
+        // let p = BigUint::from_str(PRIME_P).expect("Invalid PRIME_P");
+        // let q = BigUint::from_str(PRIME_Q).expect("Invalid PRIME_Q");
         let g = BigUint::from_str(GENERATOR).expect("Invalid GENERATOR");
         let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
 
-        let skde_params = setup(time, p, q, g, max_sequencer_number);
-        let message: &str = "asdfasdfasdfasdf";
+        // 1. Setup public parameter N
+        let start = Instant::now();
+        let skde_params = setup(time, g, max_sequencer_number);
+        let setup_duration = start.elapsed();
 
-        // 1. Generate partial keys and proofs
+        let message: &str = "12345";
+
+        println!(
+            "Setup time for public parameter {}-bit N: {:?}",
+            BIT_LEN, setup_duration
+        );
+
+        // 2. Generate partial keys and proofs
         let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
             .enumerate()
             .map(|(index, _)| {
@@ -79,14 +98,7 @@ mod tests {
             })
             .collect();
 
-        println!("Generated {} keys", MAX_SEQUENCER_NUMBER);
-        generated_keys_and_proofs
-            .iter()
-            .for_each(|(partial_key, _)| {
-                println!("Partial key: {:?}", partial_key);
-            });
-
-        // 2. Verify all generated keys
+        // 3. Verify all generated keys
         let verification_start = Instant::now();
         generated_keys_and_proofs
             .iter()
@@ -112,7 +124,7 @@ mod tests {
             .map(|(partial_key, _)| partial_key)
             .collect();
 
-        // 3. Aggregate all partial keys
+        // 4. Aggregate all partial keys
         let aggregation_start = Instant::now();
         let aggregated_key = aggregate_key(&skde_params, &partial_key_list);
         let aggregation_duration = aggregation_start.elapsed();
@@ -122,19 +134,19 @@ mod tests {
 
         println!("Encryption key: {:?}", encryption_key);
 
-        // 4. Encrypt the message
+        // 5. Encrypt the message
         let encryption_start = Instant::now();
         let cipher_text = encrypt(&skde_params, message, &encryption_key).unwrap();
         let encryption_duration = encryption_start.elapsed();
         println!("Encryption time: {:?}", encryption_duration);
 
-        // 5. Solve the time-lock puzzle
+        // 6. Solve the time-lock puzzle
         let puzzle_start = Instant::now();
         let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
         let puzzle_duration = puzzle_start.elapsed();
         println!("Puzzle solved time: {:?}", puzzle_duration);
 
-        // 6. Decrypt the cipher text
+        // 7. Decrypt the cipher text
         let decryption_start = Instant::now();
         let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key.sk).unwrap();
         let decryption_duration = decryption_start.elapsed();
