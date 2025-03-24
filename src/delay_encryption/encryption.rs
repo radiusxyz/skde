@@ -4,8 +4,9 @@ use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod, mod_exp_by_pow_of_two};
 use num_bigint::{BigUint, RandBigInt};
 use num_prime::RandPrime;
 use num_traits::{FromBytes, Num};
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 
+use super::aes_utils::{decrypt_aes, encrypt_aes};
 use crate::{
     delay_encryption::{CipherPair, Ciphertext},
     SkdeParams, BIT_LEN,
@@ -63,6 +64,19 @@ pub fn encrypt(
     skde_params: &SkdeParams,
     message: &str,
     encryption_key: &str,
+    hybrid: bool,
+) -> Result<String, EncryptionError> {
+    if hybrid {
+        encrypt_hybrid(skde_params, message, encryption_key)
+    } else {
+        encrypt_standard(skde_params, message, encryption_key)
+    }
+}
+
+fn encrypt_standard(
+    skde_params: &SkdeParams,
+    message: &str,
+    encryption_key: &str,
 ) -> Result<String, EncryptionError> {
     let cipher_pair_list: Vec<CipherPair> = message
         .as_bytes()
@@ -71,9 +85,32 @@ pub fn encrypt(
         .collect();
     let ciphertext = Ciphertext::from(cipher_pair_list);
     let bytes = bincode::serialize(&ciphertext).map_err(EncryptionError::EncodeCiphertext)?;
-    let encrypted_message = const_hex::encode(bytes);
+    Ok(const_hex::encode(bytes))
+}
 
-    Ok(encrypted_message)
+fn encrypt_hybrid(
+    skde_params: &SkdeParams,
+    message: &str,
+    encryption_key: &str,
+) -> Result<String, EncryptionError> {
+    let mut rng = thread_rng();
+    let mut aes_key = [0u8; 32]; // AES-256 key
+    let mut iv = [0u8; 12]; // AES-GCM nonce
+    rng.fill(&mut aes_key);
+    rng.fill(&mut iv);
+
+    let aes_ciphertext = encrypt_aes(message.as_bytes(), &aes_key, &iv)
+        .map_err(|_| EncryptionError::AesEncryptFailed)?;
+
+    let key_iv_combined = [&aes_key[..], &iv[..]].concat();
+    let encrypted_key = encrypt_slice(skde_params, &key_iv_combined, encryption_key);
+
+    let ciphertext = Ciphertext::Hybrid {
+        encrypted_key,
+        aes_ciphertext,
+    };
+    let bytes = bincode::serialize(&ciphertext).map_err(EncryptionError::EncodeCiphertext)?;
+    Ok(const_hex::encode(bytes))
 }
 
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -> CipherPair {
@@ -98,6 +135,7 @@ fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -
 pub enum EncryptionError {
     EncodeCiphertext(bincode::Error),
     EncodeMessage(std::string::FromUtf8Error),
+    AesEncryptFailed,
 }
 
 impl std::fmt::Display for EncryptionError {
@@ -116,22 +154,52 @@ impl std::error::Error for EncryptionError {}
 ///   AsRef<[u8]>`.
 pub fn decrypt(
     skde_params: &SkdeParams,
-    ciphertext: &str,
+    ciphertext_hex: &str,
     decryption_key: &str,
 ) -> Result<String, DecryptionError> {
-    let bytes = const_hex::decode(ciphertext).map_err(DecryptionError::DecodeHexString)?;
-    let ciphertext =
-        bincode::deserialize::<Ciphertext>(&bytes).map_err(DecryptionError::DecodeCiphertext)?;
+    let bytes = const_hex::decode(ciphertext_hex).map_err(DecryptionError::DecodeHexString)?;
 
-    let mut message_bytes = Vec::new();
-    for cipher_pair in ciphertext.iter() {
-        decrypt_inner(&mut message_bytes, skde_params, cipher_pair, decryption_key)?;
+    let ciphertext: Ciphertext =
+        bincode::deserialize(&bytes).map_err(DecryptionError::DecodeCiphertext)?;
+
+    match ciphertext {
+        Ciphertext::Standard(cipher_pairs) => {
+            let mut message_bytes = Vec::new();
+            for pair in cipher_pairs {
+                decrypt_inner(&mut message_bytes, skde_params, &pair, decryption_key)?;
+            }
+            let message_recovered =
+                String::from_utf8(message_bytes).map_err(DecryptionError::RecoverMessage)?;
+            Ok(message_recovered)
+        }
+        Ciphertext::Hybrid {
+            encrypted_key,
+            aes_ciphertext,
+        } => {
+            let mut key_iv_bytes = Vec::new();
+            decrypt_inner(
+                &mut key_iv_bytes,
+                skde_params,
+                &encrypted_key,
+                decryption_key,
+            )?;
+
+            if key_iv_bytes.len() < 44 {
+                return Err(DecryptionError::InvalidKeyIvLength);
+            }
+
+            let aes_key = &key_iv_bytes[..32];
+            let iv = &key_iv_bytes[32..];
+
+            let plain_bytes = decrypt_aes(&aes_ciphertext, aes_key, iv)
+                .map_err(|_| DecryptionError::AesDecryptFailed)?;
+
+            let message_recovered =
+                String::from_utf8(plain_bytes).map_err(DecryptionError::RecoverMessage)?;
+
+            Ok(message_recovered)
+        }
     }
-
-    let message_recovered =
-        String::from_utf8(message_bytes).map_err(DecryptionError::RecoverMessage)?;
-
-    Ok(message_recovered)
 }
 
 fn decrypt_inner(
@@ -166,6 +234,8 @@ pub enum DecryptionError {
     NoModularInverseFound,
     WriteBytes(std::io::Error),
     RecoverMessage(std::string::FromUtf8Error),
+    InvalidKeyIvLength,
+    AesDecryptFailed,
 }
 
 impl std::fmt::Display for DecryptionError {

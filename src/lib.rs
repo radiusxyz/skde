@@ -141,7 +141,7 @@ mod tests {
 
         // 5. Encrypt the message
         let encryption_start = Instant::now();
-        let cipher_text = encrypt(&skde_params, message, &encryption_key).unwrap();
+        let cipher_text = encrypt(&skde_params, message, &encryption_key, false).unwrap();
         let encryption_duration = encryption_start.elapsed();
         println!("Encryption time: {:?}", encryption_duration);
 
@@ -202,7 +202,7 @@ mod tests {
         ));
 
         let aggregated_key = aggregate_key(&skde_params, &vec![partial_key]);
-        let cipher_text = encrypt(&skde_params, &message, &aggregated_key.u).unwrap();
+        let cipher_text = encrypt(&skde_params, &message, &aggregated_key.u, false).unwrap();
         let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
         let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key.sk).unwrap();
 

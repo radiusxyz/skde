@@ -16,18 +16,42 @@ pub struct CipherPair {
     pub c2: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Ciphertext(Vec<CipherPair>);
+/// Unified enum for both encryption modes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Ciphertext {
+    /// For standard encryption: a list of encrypted chunks
+    Standard(Vec<CipherPair>),
+
+    /// For hybrid encryption: AES ciphertext with encrypted AES key
+    Hybrid {
+        encrypted_key: CipherPair,
+        aes_ciphertext: Vec<u8>,
+    },
+}
 
 impl From<Vec<CipherPair>> for Ciphertext {
     fn from(value: Vec<CipherPair>) -> Self {
-        Self(value)
+        Ciphertext::Standard(value)
     }
 }
 
 impl Ciphertext {
-    pub fn iter(&self) -> std::slice::Iter<'_, CipherPair> {
-        self.0.iter()
+    /// Returns an iterator over CipherPair if variant is Standard
+    pub fn iter(&self) -> Option<std::slice::Iter<'_, CipherPair>> {
+        match self {
+            Ciphertext::Standard(vec) => Some(vec.iter()),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this is the standard (non-hybrid) variant
+    pub fn is_standard(&self) -> bool {
+        matches!(self, Ciphertext::Standard(_))
+    }
+
+    /// Returns true if this is hybrid variant
+    pub fn is_hybrid(&self) -> bool {
+        matches!(self, Ciphertext::Hybrid { .. })
     }
 }
 

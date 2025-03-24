@@ -38,6 +38,7 @@ hash = { workspace = true }
 serde = { workspace = true }
 const-hex = "1.12"
 num-prime = "0.4.4"
+aes-gcm = "0.10" 
 
 [workspace.dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
