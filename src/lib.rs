@@ -1,5 +1,4 @@
 pub use big_integer::generate_random_biguint;
-use big_integer::mod_exp_by_pow_of_two;
 use delay_encryption::SkdeParams;
 pub use num_bigint::BigUint;
 pub use num_prime::RandPrime;
@@ -14,59 +13,78 @@ pub const BIT_LEN: usize = 2048; // n's bit length
 pub const LIMB_WIDTH: usize = 64;
 pub const LIMB_COUNT: usize = BIT_LEN / LIMB_WIDTH;
 
-pub const GENERATOR: &str = "4";
-pub const TIME_PARAM_T: u32 = 2; // delay time depends on: 2^TIME_PARMA_T
-
-pub fn setup(t: u32, g: BigUint, max_sequencer_number: BigUint) -> SkdeParams {
-    let mut rng = rand::thread_rng();
-
-    let p: BigUint = rng.gen_safe_prime_exact(BIT_LEN / 2);
-    let q: BigUint = rng.gen_safe_prime_exact(BIT_LEN / 2);
-
-    let n = p * q;
-    let h = mod_exp_by_pow_of_two(&g, t, &n);
-
-    SkdeParams {
-        t,
-        n: n.to_str_radix(10),
-        g: g.to_str_radix(10),
-        h: h.to_str_radix(10),
-        max_sequencer_number: max_sequencer_number.to_str_radix(10),
-    }
-}
+pub const GENERATOR: &str = "4"; // g = 4 is safe as long as gcd(g, n) = 1 (i.e., g is invertible mod n)
+pub const TIME_PARAM_T: u32 = 2;
 
 #[cfg(test)]
 mod tests {
     use std::{str::FromStr, time::Instant};
 
+    use big_integer::mod_exp_by_pow_of_two;
     use num_bigint::BigUint;
+    use rand::{distributions::Alphanumeric, Rng};
 
     use crate::{
-        delay_encryption::{decrypt, encrypt, solve_time_lock_puzzle},
+        delay_encryption::{decrypt, encrypt, setup, solve_time_lock_puzzle, SkdeParams},
         key_aggregation::aggregate_key,
         key_generation::{
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
         },
-        setup, BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
+        BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };
+
+    // Predefined RSA modulus for deterministic encryption test
+    pub const MOD_N: &str = "109108784166676529682340577929498188950239585527883687884827626040722072371127456712391033422811328348170518576414206624244823392702116014678887602655605057984874271545556188865755301275371611259397284800785551682318694176857633188036311000733221068448165870969366710007572931433736793827320953175136545355129";
+
+    /// For testing: returns SKDE parameters using predefined constant modulus
+    /// `MOD_N` This avoids generating expensive safe primes every time
+    fn default_skde_params() -> SkdeParams {
+        let n = BigUint::from_str(MOD_N).unwrap();
+        let g = BigUint::from_str(GENERATOR).unwrap();
+        let t = 2_u32.pow(TIME_PARAM_T);
+        let h = mod_exp_by_pow_of_two(&g, t, &n);
+        let max_seq = BigUint::from(MAX_SEQUENCER_NUMBER as u32);
+
+        SkdeParams {
+            t,
+            n: n.to_str_radix(10),
+            g: g.to_str_radix(10),
+            h: h.to_str_radix(10),
+            max_sequencer_number: max_seq.to_str_radix(10),
+        }
+    }
+
+    /// Tests the correctness of the `setup` function and generated parameters.
+    /// Ensures all fields are consistent and `n` is sufficiently large.
+    #[test]
+    fn test_secure_setup() {
+        let g = BigUint::from_str(GENERATOR).unwrap();
+        let max_seq = BigUint::from(MAX_SEQUENCER_NUMBER as u32);
+
+        // Warning: this may not be efficient for runtime tests
+        let skde_params = setup(TIME_PARAM_T, g.clone(), max_seq.clone());
+
+        let n = BigUint::from_str(&skde_params.n).unwrap();
+        let h = BigUint::from_str(&skde_params.h).unwrap();
+        let computed_h = mod_exp_by_pow_of_two(&g, TIME_PARAM_T, &n);
+
+        assert_eq!(skde_params.g, g.to_str_radix(10), "Generator mismatch");
+        assert_eq!(
+            skde_params.max_sequencer_number,
+            max_seq.to_str_radix(10),
+            "Max sequencer mismatch"
+        );
+        assert_eq!(h, computed_h, "h is not computed correctly");
+        assert_eq!(skde_params.t, TIME_PARAM_T, "Time parameter mismatch");
+        assert!(n.bits() >= BIT_LEN as u64, "Modulus too small");
+        // assert!(n.is_odd(), "Modulus n should be odd");
+    }
 
     #[test]
     fn test_single_key_delay_encryption() {
-        let time = 2_u32.pow(TIME_PARAM_T);
-        let g = BigUint::from_str(GENERATOR).expect("Invalid GENERATOR");
-        let max_sequencer_number = BigUint::from(MAX_SEQUENCER_NUMBER);
-
-        // 1. Setup public parameter N
-        let start = Instant::now();
-        let skde_params = setup(time, g, max_sequencer_number);
-        let setup_duration = start.elapsed();
-
+        // 1. Set skde parameters
+        let skde_params = default_skde_params();
         let message: &str = "12345";
-
-        println!(
-            "Setup time for public parameter {}-bit N: {:?}",
-            BIT_LEN, setup_duration
-        );
 
         // 2. Generate partial keys and proofs
         let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
@@ -106,14 +124,14 @@ mod tests {
             MAX_SEQUENCER_NUMBER, verification_duration
         );
 
-        let partial_key_list = generated_keys_and_proofs
+        let partial_keys = generated_keys_and_proofs
             .into_iter()
             .map(|(partial_key, _)| partial_key)
             .collect();
 
         // 4. Aggregate all partial keys
         let aggregation_start = Instant::now();
-        let aggregated_key = aggregate_key(&skde_params, &partial_key_list);
+        let aggregated_key = aggregate_key(&skde_params, &partial_keys);
         let aggregation_duration = aggregation_start.elapsed();
         println!("Aggregation time: {:?}", aggregation_duration);
 
@@ -147,8 +165,50 @@ mod tests {
 
     #[test]
     fn reps() {
+        // Repeats the full encryption-decryption test multiple times for robustness
         for _ in 0..10 {
             test_single_key_delay_encryption();
         }
+    }
+
+    /// Generates a random ASCII string of the specified byte length.
+    /// Only alphanumeric ASCII characters (A-Z, a-z, 0-9) are used.
+    ///
+    /// # Arguments
+    /// * `len` - The desired length of the message in bytes
+    ///
+    /// # Returns
+    /// * A `String` of exactly `len` bytes
+    fn generate_random_message(len: usize) -> String {
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(len)
+            .map(char::from)
+            .collect()
+    }
+
+    /// Tests encryption with a longer message (edge case)
+    #[test]
+    fn test_long_message_encryption() {
+        let skde_params = default_skde_params();
+        let message = generate_random_message(350);
+
+        let (secret_value, partial_key) = generate_partial_key(&skde_params);
+        let key_proof = prove_partial_key_validity(&skde_params, &secret_value);
+        assert!(verify_partial_key_validity(
+            &skde_params,
+            partial_key.clone(),
+            key_proof
+        ));
+
+        let aggregated_key = aggregate_key(&skde_params, &vec![partial_key]);
+        let cipher_text = encrypt(&skde_params, &message, &aggregated_key.u).unwrap();
+        let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
+        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key.sk).unwrap();
+
+        assert_eq!(
+            message, decrypted_message,
+            "Decryption failed for long message"
+        );
     }
 }

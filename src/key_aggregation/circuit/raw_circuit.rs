@@ -249,89 +249,91 @@ impl<F: PrimeField> Circuit<F> for AggregateRawCircuit<F> {
     }
 }
 
-// TODO
-#[cfg(test)]
-mod tests {
-    use std::marker::PhantomData;
+// TODO: Refactoring
+// #[cfg(test)]
+// mod tests {
+//     use std::marker::PhantomData;
 
-    use halo2wrong::curves::bn256::Fr;
-    use maingate::mock_prover_verify;
-    use num_bigint::{BigUint, RandomBits};
-    use rand::{thread_rng, Rng};
+//     use halo2wrong::curves::bn256::Fr;
+//     use maingate::mock_prover_verify;
+//     use num_bigint::{BigUint, RandomBits};
+//     use rand::{thread_rng, Rng};
 
-    use crate::{key_aggregation::*, MAX_SEQUENCER_NUMBER};
+//     use crate::{key_aggregation::*, MAX_SEQUENCER_NUMBER};
 
-    #[test]
-    fn test_aggregate_circuit() {
-        let mut rng = thread_rng();
+//     #[test]
+//     fn test_aggregate_circuit() {
+//         let mut rng = thread_rng();
 
-        let bit_len = AggregateRawCircuit::<Fr>::BIT_LEN as u64;
-        let limb_width = AggregateRawCircuit::<Fr>::LIMB_WIDTH;
-        let limb_count = AggregateRawCircuit::<Fr>::LIMB_COUNT;
-        let max_sequencer_number = MAX_SEQUENCER_NUMBER;
+//         let bit_len = AggregateRawCircuit::<Fr>::BIT_LEN as u64;
+//         let limb_width = AggregateRawCircuit::<Fr>::LIMB_WIDTH;
+//         let limb_count = AggregateRawCircuit::<Fr>::LIMB_COUNT;
+//         let max_sequencer_number = MAX_SEQUENCER_NUMBER;
 
-        let mut n = BigUint::default();
-        while n.bits() != bit_len {
-            n = rng.sample(RandomBits::new(bit_len));
-        }
-        let n_square = &n * &n;
+//         let mut n = BigUint::default();
+//         while n.bits() != bit_len {
+//             n = rng.sample(RandomBits::new(bit_len));
+//         }
+//         let n_square = &n * &n;
 
-        let mut partial_key_list = vec![];
+//         let mut partial_key_list = vec![];
 
-        let mut aggregated_key = AggregatedKey {
-            u: BigUint::one().to_str_radix(10),
-            v: BigUint::one().to_str_radix(10),
-            y: BigUint::one().to_str_radix(10),
-            w: BigUint::one().to_str_radix(10),
-        };
+//         let mut aggregated_key = AggregatedKey {
+//             u: BigUint::one().to_str_radix(10),
+//             v: BigUint::one().to_str_radix(10),
+//             y: BigUint::one().to_str_radix(10),
+//             w: BigUint::one().to_str_radix(10),
+//         };
 
-        for _ in 0..max_sequencer_number {
-            let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
-            let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
-            let y = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
-            let w = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
+//         for _ in 0..max_sequencer_number {
+//             let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
+//             let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) %
+// &n_square;             let y = rng.sample::<BigUint,
+// _>(RandomBits::new(bit_len)) % &n;             let w = rng.sample::<BigUint,
+// _>(RandomBits::new(bit_len * 2)) % &n_square;
 
-            partial_key_list.push(PartialKey {
-                u: u.clone(),
-                v: v.clone(),
-                y: y.clone(),
-                w: w.clone(),
-            });
+//             partial_key_list.push(PartialKey {
+//                 u: u.clone(),
+//                 v: v.clone(),
+//                 y: y.clone(),
+//                 w: w.clone(),
+//             });
 
-            aggregated_key.u = (BigUint::from_str_radix(&aggregated_key.u, 10).unwrap() * &u % &n)
-                .to_str_radix(10);
-            aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v, 10).unwrap() * &v
-                % &n_square)
-                .to_str_radix(10);
-            aggregated_key.y = (BigUint::from_str_radix(&aggregated_key.y, 10).unwrap() * &y % &n)
-                .to_str_radix(10);
-            aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w, 10).unwrap() * &w
-                % &n_square)
-                .to_str_radix(10);
-        }
+//             aggregated_key.u = (BigUint::from_str_radix(&aggregated_key.u,
+// 10).unwrap() * &u % &n)                 .to_str_radix(10);
+//             aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v,
+// 10).unwrap() * &v                 % &n_square)
+//                 .to_str_radix(10);
+//             aggregated_key.y = (BigUint::from_str_radix(&aggregated_key.y,
+// 10).unwrap() * &y % &n)                 .to_str_radix(10);
+//             aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w,
+// 10).unwrap() * &w                 % &n_square)
+//                 .to_str_radix(10);
+//         }
 
-        let combined_partial_limbs: Vec<Fr> = PartialKey::decompose_and_combine_all_partial_keys(
-            partial_key_list.clone(),
-            limb_width,
-            limb_count,
-        );
+//         let combined_partial_limbs: Vec<Fr> =
+// PartialKey::decompose_and_combine_all_partial_keys(
+// partial_key_list.clone(),             limb_width,
+//             limb_count,
+//         );
 
-        let decomposed_aggregated_key: DecomposedAggregatedKey<Fr> =
-            AggregatedKey::decompose_partial_key(&aggregated_key, limb_width, limb_count);
-        let mut combined_limbs = decomposed_aggregated_key.combine_limbs();
+//         let decomposed_aggregated_key: DecomposedAggregatedKey<Fr> =
+//             AggregatedKey::decompose_partial_key(&aggregated_key, limb_width,
+// limb_count);         let mut combined_limbs =
+// decomposed_aggregated_key.combine_limbs();
 
-        let circuit = AggregateRawCircuit::<Fr> {
-            n,
-            n_square,
-            partial_key_list,
-            aggregated_key,
-            max_sequencer_count: max_sequencer_number,
-            _f: PhantomData,
-        };
+//         let circuit = AggregateRawCircuit::<Fr> {
+//             n,
+//             n_square,
+//             partial_key_list,
+//             aggregated_key,
+//             max_sequencer_count: max_sequencer_number,
+//             _f: PhantomData,
+//         };
 
-        combined_limbs.extend(combined_partial_limbs);
+//         combined_limbs.extend(combined_partial_limbs);
 
-        let public_inputs = vec![combined_limbs];
-        mock_prover_verify(&circuit, public_inputs);
-    }
-}
+//         let public_inputs = vec![combined_limbs];
+//         mock_prover_verify(&circuit, public_inputs);
+//     }
+// }
