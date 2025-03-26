@@ -4,7 +4,7 @@ use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod, can_be_divided};
 use num_bigint::BigUint;
 use num_traits::{Num, One};
 
-use super::SecretKey;
+use super::{decrypt, encrypt, SecretKey};
 use crate::{key_aggregation::AggregatedKey, SkdeParams};
 
 /// Solves the time-lock puzzle from the SKDE protocol and recovers the
@@ -80,5 +80,35 @@ pub fn solve_time_lock_puzzle(
             ErrorKind::Other,
             "Result is not divisible by n",
         ))
+    }
+}
+
+/// Validates that the given secret key can correctly decrypt a ciphertext
+/// encrypted with the same SKDE parameters and encryption key.
+///
+/// # Returns
+/// - `true` if decryption is successful
+/// - `false` if decryption fails or recovered message is incorrect
+pub fn validate_secret_key(
+    skde_params: &SkdeParams,
+    encryption_key: &str,
+    secret_key: &str,
+    hybrid: bool,
+) -> bool {
+    let message = "test message for validation";
+
+    // Try encrypting the message
+    let enc_result = encrypt(skde_params, message, encryption_key, hybrid);
+    if enc_result.is_err() {
+        return false;
+    }
+    let ciphertext = enc_result.unwrap();
+
+    // Try decrypting with the given secret key
+    let dec_result = decrypt(skde_params, &ciphertext, secret_key);
+    if let Ok(decrypted) = dec_result {
+        decrypted == message
+    } else {
+        false
     }
 }
