@@ -54,7 +54,21 @@ pub fn setup(t: u32, g: BigUint, max_sequencer_number: BigUint) -> SkdeParams {
     }
 }
 
-/// Return the encrypted message as hexadecimal string.
+/// Top-level encryption API for SKDE.
+///
+/// # Parameters
+/// - `skde_params`: Public parameters used for encryption.
+/// - `message`: Plaintext message to encrypt.
+/// - `encryption_key`: Public key used in the encryption (as decimal string).
+/// - `hybrid`: If true, use hybrid (AES + public-key) encryption; otherwise,
+///   use standard encryption.
+///
+/// # Returns
+/// - Hex-encoded ciphertext as `String`, using `bincode` serialization and
+///   `const_hex` encoding.
+///
+/// # Errors
+/// - Returns `EncryptionError` variants if AES or serialization fails.
 ///
 /// # Todo:
 /// - Modify chunk size to increase performance.
@@ -73,6 +87,16 @@ pub fn encrypt(
     }
 }
 
+/// Encrypts the message using standard SKDE encryption (without symmetric
+/// encryption).
+///
+/// # Process
+/// - Splits the message into 64-byte chunks
+/// - Encrypts each chunk individually using public-key encryption
+/// - Returns a serialized and hex-encoded ciphertext
+///
+/// # Note
+/// - This is less efficient for large messages compared to hybrid encryption.
 fn encrypt_standard(
     skde_params: &SkdeParams,
     message: &str,
@@ -88,6 +112,20 @@ fn encrypt_standard(
     Ok(const_hex::encode(bytes))
 }
 
+/// Performs hybrid encryption using AES-GCM for message encryption,
+/// and SKDE for encrypting the AES key and IV.
+///
+/// # Process
+/// 1. Randomly generate 256-bit AES key and 96-bit IV
+/// 2. Encrypt the message with AES-GCM
+/// 3. Concatenate AES key + IV and encrypt using SKDE public-key encryption
+/// 4. Wrap everything into `Ciphertext::Hybrid` and serialize
+///
+/// # Returns
+/// - Hex-encoded serialized ciphertext
+///
+/// # Errors
+/// - If AES encryption or serialization fails, returns an `EncryptionError`
 fn encrypt_hybrid(
     skde_params: &SkdeParams,
     message: &str,
@@ -113,6 +151,20 @@ fn encrypt_hybrid(
     Ok(const_hex::encode(bytes))
 }
 
+/// Encrypts a slice of bytes using SKDE's public-key encryption logic.
+///
+/// # Parameters
+/// - `skde_params`: SKDE public parameters
+/// - `slice`: Plaintext bytes to encrypt
+/// - `encryption_key`: RSA-like public key used for encryption
+///
+/// # Returns
+/// - A `CipherPair` containing `(c1, c2)` such that:
+///   - `c1 = g^l mod n`
+///   - `c2 = m * pk^l mod n`
+///
+/// # Security
+/// - Introduces randomness via random exponent `l`, ensuring semantic security
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -> CipherPair {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
@@ -131,22 +183,25 @@ fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -
     }
 }
 
-#[derive(Debug)]
-pub enum EncryptionError {
-    EncodeCiphertext(bincode::Error),
-    EncodeMessage(std::string::FromUtf8Error),
-    AesEncryptFailed,
-}
-
-impl std::fmt::Display for EncryptionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl std::error::Error for EncryptionError {}
-
-/// Return the original message string from ciphertext as hexadecimal string.
+/// Decrypts a ciphertext (standard or hybrid) and returns the plaintext
+/// message.
+///
+/// # Parameters
+/// - `skde_params`: SKDE public parameters
+/// - `ciphertext_hex`: Hex-encoded ciphertext string
+/// - `decryption_key`: Private key as decimal string
+///
+/// # Returns
+/// - Decrypted plaintext message as a `String`
+///
+/// # Flow
+/// - If ciphertext is `Standard`: decrypts each chunk using SKDE
+/// - If ciphertext is `Hybrid`: decrypts AES key + IV first, then uses AES-GCM
+///   to decrypt message
+///
+/// # Errors
+/// - Returns detailed `DecryptionError` variants for all failure cases (hex
+///   decode, AES failure, invalid structure)
 ///
 /// # Todo:
 /// - When the message parameter in [`encrypt()`] generalizes to any type that
@@ -202,6 +257,21 @@ pub fn decrypt(
     }
 }
 
+/// Core decryption function for a single `(c1, c2)` pair.
+///
+/// # Parameters
+/// - `message_bytes`: Output buffer for appending plaintext bytes
+/// - `skde_params`: SKDE public parameters
+/// - `cipher_pair`: The ciphertext pair (c1, c2) to decrypt
+/// - `decryption_key`: Secret key in decimal string
+///
+/// # Returns
+/// - Appends decrypted bytes to `message_bytes` on success
+///
+/// # Errors
+/// - Returns `DecryptionError::NoModularInverseFound` if modular inverse does
+///   not exist
+/// - Returns `DecryptionError::WriteBytes` on I/O error during buffer write
 fn decrypt_inner(
     message_bytes: &mut Vec<u8>,
     skde_params: &SkdeParams,
@@ -227,6 +297,36 @@ fn decrypt_inner(
     Ok(())
 }
 
+/// Represents all possible errors that can occur during encryption.
+///
+/// - `EncodeCiphertext`: bincode serialization failure
+/// - `EncodeMessage`: UTF-8 conversion error (currently unused)
+/// - `AesEncryptFailed`: AES encryption failed (usually from invalid
+///   parameters)
+#[derive(Debug)]
+pub enum EncryptionError {
+    EncodeCiphertext(bincode::Error),
+    EncodeMessage(std::string::FromUtf8Error),
+    AesEncryptFailed,
+}
+
+impl std::fmt::Display for EncryptionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for EncryptionError {}
+
+/// Represents all possible errors during decryption.
+///
+/// - `DecodeHexString`: Hex decoding of ciphertext string failed
+/// - `DecodeCiphertext`: Deserialization from bincode failed
+/// - `NoModularInverseFound`: Modular inverse does not exist for decryption
+/// - `WriteBytes`: I/O error writing to message buffer
+/// - `RecoverMessage`: UTF-8 conversion of decrypted message failed
+/// - `InvalidKeyIvLength`: Hybrid decryption failed due to corrupted key/IV
+/// - `AesDecryptFailed`: AES decryption failed
 #[derive(Debug)]
 pub enum DecryptionError {
     DecodeHexString(const_hex::FromHexError),

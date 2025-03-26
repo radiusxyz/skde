@@ -80,95 +80,174 @@ mod tests {
         // assert!(n.is_odd(), "Modulus n should be odd");
     }
 
-    #[test]
-    fn test_single_key_delay_encryption() {
-        // 1. Set skde parameters
-        let skde_params = default_skde_params();
-        let message: &str = "12345";
+    // #[test]
+    // fn test_single_key_delay_encryption() {
+    //     // 1. Set skde parameters
+    //     let skde_params = default_skde_params();
+    //     let message: &str = "12345";
 
-        // 2. Generate partial keys and proofs
+    //     // 2. Generate partial keys and proofs
+    //     let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
+    //         .enumerate()
+    //         .map(|(index, _)| {
+    //             let start = Instant::now();
+    //             let (secret_value, partial_key) =
+    // generate_partial_key(&skde_params);             let key_proof =
+    // prove_partial_key_validity(&skde_params, &secret_value);             let
+    // generation_duration = start.elapsed();             println!(
+    //                 "Sequencer{}'s key and proof generation time: {:?}",
+    //                 index + 1,
+    //                 generation_duration
+    //             );
+    //             (partial_key, key_proof)
+    //         })
+    //         .collect();
+
+    //     // 3. Verify all generated keys
+    //     let verification_start = Instant::now();
+    //     generated_keys_and_proofs
+    //         .iter()
+    //         .for_each(|(partial_key, key_proof)| {
+    //             assert!(
+    //                 verify_partial_key_validity(
+    //                     &skde_params,
+    //                     partial_key.clone(),
+    //                     key_proof.clone()
+    //                 ),
+    //                 "Key verification failed"
+    //             );
+    //         });
+    //     let verification_duration = verification_start.elapsed();
+
+    //     println!(
+    //         "Total key verification time for {} keys: {:?}",
+    //         MAX_SEQUENCER_NUMBER, verification_duration
+    //     );
+
+    //     let partial_keys = generated_keys_and_proofs
+    //         .into_iter()
+    //         .map(|(partial_key, _)| partial_key)
+    //         .collect();
+
+    //     // 4. Aggregate all partial keys
+    //     let aggregation_start = Instant::now();
+    //     let aggregated_key = aggregate_key(&skde_params, &partial_keys);
+    //     let aggregation_duration = aggregation_start.elapsed();
+    //     println!("Aggregation time: {:?}", aggregation_duration);
+
+    //     let encryption_key = aggregated_key.u.clone();
+
+    //     println!("Encryption key: {:?}", encryption_key);
+
+    //     // 5. Encrypt the message
+    //     let encryption_start = Instant::now();
+    //     let cipher_text = encrypt(&skde_params, message, &encryption_key,
+    // false).unwrap();     let encryption_duration =
+    // encryption_start.elapsed();     println!("Encryption time: {:?}",
+    // encryption_duration);
+
+    //     // 6. Solve the time-lock puzzle
+    //     let puzzle_start = Instant::now();
+    //     let secret_key = solve_time_lock_puzzle(&skde_params,
+    // &aggregated_key).unwrap();     let puzzle_duration =
+    // puzzle_start.elapsed();     println!("Puzzle solved time: {:?}",
+    // puzzle_duration);
+
+    //     // 7. Decrypt the cipher text
+    //     let decryption_start = Instant::now();
+    //     let decrypted_message = decrypt(&skde_params, &cipher_text,
+    // &secret_key.sk).unwrap();     let decryption_duration =
+    // decryption_start.elapsed();     println!("Decryption time: {:?}",
+    // decryption_duration);
+
+    //     assert_eq!(
+    //         message, decrypted_message,
+    //         "Decrypted message is not the same with the original message"
+    //     );
+    // }
+
+    #[test]
+    fn test_standard_encryption() {
+        test_single_key_delay_encryption_flow(false, 128, "Standard Encryption (128 bytes)");
+    }
+
+    #[test]
+    fn test_hybrid_encryption() {
+        test_single_key_delay_encryption_flow(true, 256, "Hybrid Encryption (256 bytes)");
+    }
+    /// Runs encryption-decryption test with the given configuration.
+    ///
+    /// # Parameters
+    /// - `hybrid`: true for hybrid encryption, false for standard
+    /// - `message_len`: length of the plaintext message to generate
+    /// - `label`: label used in assertion and output
+    fn test_single_key_delay_encryption_flow(hybrid: bool, message_len: usize, label: &str) {
+        let skde_params = default_skde_params();
+        let message = generate_random_message(message_len);
+
+        // 1. Generate partial keys and proofs
         let generated_keys_and_proofs: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
-            .enumerate()
-            .map(|(index, _)| {
-                let start = Instant::now();
+            .map(|_| {
                 let (secret_value, partial_key) = generate_partial_key(&skde_params);
                 let key_proof = prove_partial_key_validity(&skde_params, &secret_value);
-                let generation_duration = start.elapsed();
-                println!(
-                    "Sequencer{}'s key and proof generation time: {:?}",
-                    index + 1,
-                    generation_duration
-                );
                 (partial_key, key_proof)
             })
             .collect();
 
-        // 3. Verify all generated keys
-        let verification_start = Instant::now();
-        generated_keys_and_proofs
-            .iter()
-            .for_each(|(partial_key, key_proof)| {
-                assert!(
-                    verify_partial_key_validity(
-                        &skde_params,
-                        partial_key.clone(),
-                        key_proof.clone()
-                    ),
-                    "Key verification failed"
-                );
-            });
-        let verification_duration = verification_start.elapsed();
-
-        println!(
-            "Total key verification time for {} keys: {:?}",
-            MAX_SEQUENCER_NUMBER, verification_duration
-        );
+        // 2. Verify all keys
+        for (partial_key, key_proof) in &generated_keys_and_proofs {
+            assert!(
+                verify_partial_key_validity(&skde_params, partial_key.clone(), key_proof.clone()),
+                "Key verification failed"
+            );
+        }
 
         let partial_keys = generated_keys_and_proofs
             .into_iter()
             .map(|(partial_key, _)| partial_key)
-            .collect();
+            .collect::<Vec<_>>();
 
-        // 4. Aggregate all partial keys
-        let aggregation_start = Instant::now();
+        // 3. Aggregate keys
         let aggregated_key = aggregate_key(&skde_params, &partial_keys);
-        let aggregation_duration = aggregation_start.elapsed();
-        println!("Aggregation time: {:?}", aggregation_duration);
-
         let encryption_key = aggregated_key.u.clone();
 
-        println!("Encryption key: {:?}", encryption_key);
+        // 4. Encrypt
+        let ciphertext = encrypt(&skde_params, &message, &encryption_key, hybrid).unwrap();
 
-        // 5. Encrypt the message
-        let encryption_start = Instant::now();
-        let cipher_text = encrypt(&skde_params, message, &encryption_key, false).unwrap();
-        let encryption_duration = encryption_start.elapsed();
-        println!("Encryption time: {:?}", encryption_duration);
-
-        // 6. Solve the time-lock puzzle
-        let puzzle_start = Instant::now();
+        // 5. Solve time-lock puzzle
         let secret_key = solve_time_lock_puzzle(&skde_params, &aggregated_key).unwrap();
-        let puzzle_duration = puzzle_start.elapsed();
-        println!("Puzzle solved time: {:?}", puzzle_duration);
 
-        // 7. Decrypt the cipher text
-        let decryption_start = Instant::now();
-        let decrypted_message = decrypt(&skde_params, &cipher_text, &secret_key.sk).unwrap();
-        let decryption_duration = decryption_start.elapsed();
-        println!("Decryption time: {:?}", decryption_duration);
+        // 6. Decrypt
+        let decrypted = decrypt(&skde_params, &ciphertext, &secret_key.sk).unwrap();
 
+        // 7. Assert
         assert_eq!(
-            message, decrypted_message,
-            "Decrypted message is not the same with the original message"
+            message, decrypted,
+            "{} failed: output did not match input",
+            label
         );
+
+        // 8. Print clean summary
+        print_test_summary(label, hybrid, message_len, true);
     }
 
     #[test]
     fn reps() {
         // Repeats the full encryption-decryption test multiple times for robustness
         for _ in 0..10 {
-            test_single_key_delay_encryption();
+            test_standard_encryption();
+            test_hybrid_encryption();
         }
+    }
+
+    fn print_test_summary(label: &str, hybrid: bool, message_len: usize, success: bool) {
+        let encryption_type = if hybrid { "Hybrid" } else { "Standard" };
+        let status = if success { "OK" } else { "FAIL" };
+
+        println!(
+            "[Test] {:<35} | Type: {:<8} | Length: {:>4} bytes | Result: {}",
+            label, encryption_type, message_len, status
+        );
     }
 
     /// Generates a random ASCII string of the specified byte length.
