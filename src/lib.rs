@@ -22,14 +22,14 @@ mod tests {
 
     use big_integer::mod_exp_by_pow_of_two;
     use num_bigint::BigUint;
-    use num_integer::Integer;
     use rand::{distributions::Alphanumeric, Rng};
 
     use crate::{
         delay_encryption::{decrypt, encrypt, setup, solve_time_lock_puzzle, SkdeParams},
         key_aggregation::aggregate_key,
         key_generation::{
-            generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
+            generate_partial_key, generate_range_proof, prove_partial_key_validity, setup_env,
+            setup_inputs, verify_partial_key_validity, verify_proof,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };
@@ -134,6 +134,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_range_proof() {
+        let (base, modulus, range, result) = setup_inputs();
+        let env = setup_env(&base, &modulus, &range, &result);
+        let proof = generate_range_proof(env);
+        verify_proof(&proof.receipt);
+    }
+
     /// Tests the correctness of the `setup` function and generated parameters.
     /// Ensures all fields are consistent and `n` is sufficiently large.
     #[test]
@@ -159,7 +167,6 @@ mod tests {
         println!("{:?}", n.bits());
         assert!(n.bits() >= (BIT_LEN - 1) as u64, "Modulus too small");
         // assert!(n.is_odd(), "Modulus n should be odd");
-
     }
 
     #[test]

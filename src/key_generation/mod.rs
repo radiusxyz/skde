@@ -1,4 +1,5 @@
 mod partial_key_validity;
+mod range_proof;
 mod types;
 
 use big_integer::{big_pow_mod, generate_random_biguint, BigIntChip, BigIntInstructions};
@@ -8,6 +9,7 @@ use maingate::RegionCtx;
 use num_bigint::BigUint;
 use num_traits::{Num, One};
 pub use partial_key_validity::*;
+pub use range_proof::*;
 pub use types::*;
 
 use crate::SkdeParams;
