@@ -37,6 +37,7 @@ poseidon = { workspace = true }
 hash = { workspace = true }
 serde = { workspace = true }
 const-hex = "1.12"
+num-prime = "0.4.4"
 
 [workspace.dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
@@ -64,10 +65,6 @@ criterion = { version = "0.3", features = ["html_reports"] }
 [lib]
 doctest = false
 bench = false
-
-[[bench]]
-name = "aggregate"
-harness = false
 
 [[bench]]
 name = "aggregate_with_hash"

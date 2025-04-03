@@ -1,10 +1,8 @@
 use ff::{FromUniformBytes, PrimeField};
-
 use halo2wrong::{
     halo2::{circuit::Value, plonk::Error},
     RegionCtx,
 };
-
 use maingate::{AssignedValue, MainGate, MainGateConfig, MainGateInstructions, Term};
 
 use crate::{SparseMDSMatrix, Spec, State};

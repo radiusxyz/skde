@@ -1,6 +1,8 @@
-use crate::spec::MDSMatrix;
-use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
 use std::marker::PhantomData;
+
+use halo2wrong::halo2::halo2curves::group::ff::{FromUniformBytes, PrimeField};
+
+use crate::spec::MDSMatrix;
 
 /// Grain initializes round constants and MDS matrix at given sponge parameters
 pub(super) struct Grain<F: PrimeField, const T: usize, const RATE: usize> {

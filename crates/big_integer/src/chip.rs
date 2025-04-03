@@ -1,19 +1,18 @@
 use std::marker::PhantomData;
 
-use crate::{
-    AssignedInteger, AssignedLimb, BigIntInstructions, Fresh, Muled, RangeType, RefreshAux,
-    UnassignedInteger,
-};
+// zeroknight
+use ff::PrimeField;
 use halo2wrong::halo2::{circuit::Value, plonk::Error};
 use maingate::{
     big_to_fe, decompose_big, fe_to_big, AssignedValue, MainGate, MainGateConfig,
     MainGateInstructions, RangeChip, RangeConfig, RangeInstructions, RegionCtx,
 };
-
 use num_bigint::BigUint;
 
-// zeroknight
-use ff::PrimeField;
+use crate::{
+    AssignedInteger, AssignedLimb, BigIntInstructions, Fresh, Muled, RangeType, RefreshAux,
+    UnassignedInteger,
+};
 
 /// Configuration for [`BigIntChip`].
 #[derive(Clone, Debug)]
@@ -25,7 +24,8 @@ pub struct BigIntConfig {
 }
 
 impl BigIntConfig {
-    /// Creates new [`BigIntConfig`] from [`RangeConfig`] and [`MainGateConfig`].
+    /// Creates new [`BigIntConfig`] from [`RangeConfig`] and
+    /// [`MainGateConfig`].
     ///
     /// # Arguments
     /// * range_config - a configuration for [`RangeChip`].
@@ -46,9 +46,12 @@ impl BigIntConfig {
 pub struct BigIntChip<F: PrimeField> {
     /// Chip configuration.
     config: BigIntConfig,
-    /// The width of each limb of the [`Fresh`] type integer in this chip. That is, the limb is an `limb_width`-bits integer.
+    /// The width of each limb of the [`Fresh`] type integer in this chip. That
+    /// is, the limb is an `limb_width`-bits integer.
     limb_width: usize,
-    /// The default number of limbs in the [`Fresh`] assigned integer in this chip. It can be changed by arithmetic operations (e.g. `add`, `sub`, `mul`).
+    /// The default number of limbs in the [`Fresh`] assigned integer in this
+    /// chip. It can be changed by arithmetic operations (e.g. `add`, `sub`,
+    /// `mul`).
     num_limbs: usize,
     _f: PhantomData<F>,
 }
@@ -61,7 +64,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `integer` - a variable integer to assign.
     ///
     /// # Return values
-    /// Returns a new [`AssignedInteger`]. The bit length of each limb is less than `self.limb_width`, and the number of its limbs is `self.num_limbs`.
+    /// Returns a new [`AssignedInteger`]. The bit length of each limb is less
+    /// than `self.limb_width`, and the number of its limbs is `self.num_limbs`.
     fn assign_integer(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -91,10 +95,12 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `integer` - a constant integer to assign.
     ///
     /// # Return values
-    /// Returns a new [`AssignedInteger`]. The bit length of each limb is less than `self.limb_width`, and the number of its limbs is `self.num_limbs`.
+    /// Returns a new [`AssignedInteger`]. The bit length of each limb is less
+    /// than `self.limb_width`, and the number of its limbs is `self.num_limbs`.
     ///
     /// # Panics
-    /// Panics if the number of limbs of `integer` is greater than `self.num_limbs`.
+    /// Panics if the number of limbs of `integer` is greater than
+    /// `self.num_limbs`.
     fn assign_constant_fresh(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -112,13 +118,18 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `num_limbs_l` - a parameter to specify the number of limbs.
     /// * `num_limbs_r` - a parameter to specify the number of limbs.
     ///
-    /// If you consider the returned [`AssignedInteger`] to be the product of integers `l` and `r`, you must specify the lengths of the limbs of integers `l` and `r` as `num_limbs_l` and `num_limbs_l`, respectively.
+    /// If you consider the returned [`AssignedInteger`] to be the product of
+    /// integers `l` and `r`, you must specify the lengths of the limbs of
+    /// integers `l` and `r` as `num_limbs_l` and `num_limbs_l`, respectively.
     ///
     /// # Return values
-    /// Returns a new [`AssignedInteger`]. The bit length of each limb is less than `self.limb_width`, and the number of its limbs is `num_limbs_l + num_limbs_r - 1`.
+    /// Returns a new [`AssignedInteger`]. The bit length of each limb is less
+    /// than `self.limb_width`, and the number of its limbs is `num_limbs_l +
+    /// num_limbs_r - 1`.
     ///
     /// # Panics
-    /// Panics if the number of limbs of `integer` is greater than `num_limbs_l + num_limbs_r - 1`.
+    /// Panics if the number of limbs of `integer` is greater than `num_limbs_l
+    /// + num_limbs_r - 1`.
     fn assign_constant_muled(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -137,7 +148,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `num_limbs` - the number of limbs.
     ///
     /// # Return values
-    /// Returns a new [`AssignedInteger`]. Its each limb is equivalent to `2^(self.limb_width)-1`, and the number of its limbs is `num_limbs`.
+    /// Returns a new [`AssignedInteger`]. Its each limb is equivalent to
+    /// `2^(self.limb_width)-1`, and the number of its limbs is `num_limbs`.
     fn max_value(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -161,26 +173,33 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// # Arguments
     /// * `ctx` - a region context.
     /// * `a` - an assigned integer whose type is [`AssignedInteger<F, Muled>`].
-    /// * `aux` - auxiliary data for refreshing a [`Muled`] type integer to a [`Fresh`] type integer.
+    /// * `aux` - auxiliary data for refreshing a [`Muled`] type integer to a
+    ///   [`Fresh`] type integer.
     ///
     /// # Return values
     /// Returns a refreshed `a` whose type is [`AssignedInteger<F, Fresh>`].
     ///
     /// # Panics
-    /// Panics if `self.limb_width` is not equal to `aux.limb_width` or `a.num_limbs()` is not equal to `aux.num_limbs_l + aux.num_limbs_r - 1`.
+    /// Panics if `self.limb_width` is not equal to `aux.limb_width` or
+    /// `a.num_limbs()` is not equal to `aux.num_limbs_l + aux.num_limbs_r - 1`.
     fn refresh(
         &self,
         ctx: &mut RegionCtx<'_, F>,
         a: &AssignedInteger<F, Muled>,
         aux: &RefreshAux,
     ) -> Result<AssignedInteger<F, Fresh>, Error> {
-        // For converting `a` to a [`Fresh`] type integer, we decompose each limb of `a` into `self.limb_width`-bits values.
+        // For converting `a` to a [`Fresh`] type integer, we decompose each limb of `a`
+        // into `self.limb_width`-bits values.
         assert_eq!(self.limb_width, aux.limb_width);
-        // The i-th value of `aux.increased_limbs_vec` represents the number of increased values when converting i-th limb of `a` into `self.limb_width`-bits values.
+        // The i-th value of `aux.increased_limbs_vec` represents the number of
+        // increased values when converting i-th limb of `a` into `self.limb_width`-bits
+        // values.
         let increased_limbs_vec = aux.increased_limbs_vec.clone();
         let num_limbs_l = aux.num_limbs_l;
         let num_limbs_r = aux.num_limbs_r;
-        // The following assertion holds since `a` is the product of two integers `l` and `r` whose number of limbs is `num_limbs_l` and `num_limbs_r`, respectively.
+        // The following assertion holds since `a` is the product of two integers `l`
+        // and `r` whose number of limbs is `num_limbs_l` and `num_limbs_r`,
+        // respectively.
         assert_eq!(a.num_limbs(), num_limbs_l + num_limbs_r - 1);
         let num_limbs_fresh = increased_limbs_vec.len();
 
@@ -212,20 +231,21 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
                 // We use `q` as the next `limb`.
                 limb = q;
             }
-            // `limb` should be zero because we decomposed all bits of the `i`-th overflowing limb value into `self.limb_width` bits values.
+            // `limb` should be zero because we decomposed all bits of the `i`-th
+            // overflowing limb value into `self.limb_width` bits values.
             main_gate.assert_zero(ctx, &limb)?;
         }
         let range_chip = self.range_chip();
         // Assert that the new limb values fit in `self.limb_widt` bits.
-        for i in 0..num_limbs_fresh {
-            let limb_val = refreshed_limbs[i].value().map(|f| *f);
-            let range_assigned = range_chip.assign(
-                ctx,
-                limb_val,
-                Self::sublimb_bit_len(self.limb_width),
-                self.limb_width,
-            )?;
-            main_gate.assert_equal(ctx, &refreshed_limbs[i], &range_assigned)?;
+        let sublimb_bit_len = Self::sublimb_bit_len(self.limb_width);
+
+        for refreshed_limb in refreshed_limbs.iter() {
+            let limb_val = refreshed_limb.value().copied();
+
+            let range_assigned =
+                range_chip.assign(ctx, limb_val, sublimb_bit_len, self.limb_width)?;
+
+            main_gate.assert_equal(ctx, refreshed_limb, &range_assigned)?;
         }
         let refreshed_limbs = refreshed_limbs
             .into_iter()
@@ -244,7 +264,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     ///
     /// # Return values
     /// Returns the addition result `a + b` as [`AssignedInteger<F, Fresh>`].
-    /// The resulting number of limbs is equivalent to `max(a.num_limbs(), b.num_limbs()) + 1`.
+    /// The resulting number of limbs is equivalent to `max(a.num_limbs(),
+    /// b.num_limbs()) + 1`.
     fn add(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -307,29 +328,36 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `b` - input of subtraction.
     ///
     /// # Return values
-    /// Returns the subtraction result as [`AssignedInteger<F, Fresh>`] and the assigned bit as [`AssignedValue<F, Fresh>`] that represents whether the result is overflowed or not.
-    /// If `a>=b`, the result is equivalent to `a - b` and the bit is zero.
-    /// Otherwise, the result is equivalent to `b - a` and the bit is one.
+    /// Returns the subtraction result as [`AssignedInteger<F, Fresh>`] and the
+    /// assigned bit as [`AssignedValue<F, Fresh>`] that represents whether the
+    /// result is overflowed or not. If `a>=b`, the result is equivalent to
+    /// `a - b` and the bit is zero. Otherwise, the result is equivalent to
+    /// `b - a` and the bit is one.
     fn sub(
         &self,
         ctx: &mut RegionCtx<'_, F>,
         a: &AssignedInteger<F, Fresh>,
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<(AssignedInteger<F, Fresh>, AssignedValue<F>), Error> {
-        // Instead of directly computing `a - b`, we first compute `(a + max - b)`, where `max` denotes the maximum integer whose number of limbs is `b.num_limbs()`.
-        // It prevents the subtraction　result from being negative.
+        // Instead of directly computing `a - b`, we first compute `(a + max - b)`,
+        // where `max` denotes the maximum integer whose number of limbs is
+        // `b.num_limbs()`. It prevents the subtraction　result from being
+        // negative.
         let n2 = b.num_limbs();
         let max_int = self.max_value(ctx, n2)?;
-        // The number of limbs of `inflated_a` is `max(a.num_limbs(), b.num_limbs()) + 1`.
+        // The number of limbs of `inflated_a` is `max(a.num_limbs(), b.num_limbs()) +
+        // 1`.
         let inflated_a = self.add(ctx, a, &max_int)?;
-        // The number of limbs of `inflated_subed` is `max(a.num_limbs(), b.num_limbs()) + 1`.
+        // The number of limbs of `inflated_subed` is `max(a.num_limbs(), b.num_limbs())
+        // + 1`.
         let inflated_subed = self.sub_unchecked(ctx, &inflated_a, b)?;
 
         let main_gate = self.main_gate();
         let one = main_gate.assign_bit(ctx, Value::known(F::ONE))?;
 
-        // Determine if `a - b` is overflowed by checking the `b.num_limbs()`-th limb of `inflated_subed`.
-        // If the limb is equal to one, no overflow is occurring because it implies `(a + max - b) >= max <=> a - b >= 0`.
+        // Determine if `a - b` is overflowed by checking the `b.num_limbs()`-th limb of
+        // `inflated_subed`. If the limb is equal to one, no overflow is
+        // occurring because it implies `(a + max - b) >= max <=> a - b >= 0`.
         let is_not_overflowed = main_gate.is_equal(ctx, &inflated_subed.limb(n2), &one)?;
         let is_overflowed = main_gate.not(ctx, &is_not_overflowed)?;
 
@@ -383,9 +411,11 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `b` - input of multiplication.
     ///
     /// # Return values
-    /// Returns the multiplication result `a * b` as [`AssignedInteger<F, Muled>`].
-    /// Its range type is [`Muled`] because its limb may overflow the maximum value of the [`Fresh`] type limb, i.e., `2^(self.limb_width)-1`.
-    /// Its number of limbs is equivalent to `a.num_limbs() + b.num_limbs() - 1`.
+    /// Returns the multiplication result `a * b` as [`AssignedInteger<F,
+    /// Muled>`]. Its range type is [`Muled`] because its limb may overflow
+    /// the maximum value of the [`Fresh`] type limb, i.e.,
+    /// `2^(self.limb_width)-1`. Its number of limbs is equivalent to
+    /// `a.num_limbs() + b.num_limbs() - 1`.
     fn mul(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -394,7 +424,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     ) -> Result<AssignedInteger<F, Muled>, Error> {
         // The following constraints are designed with reference to PolynomialMultiplier template in https://github.com/jacksoom/circom-bigint/blob/master/circuits/mult.circom.
         // However, unlike the circom-bigint implementation, we do not adopt the xJsnark's multiplication technique in https://akosba.github.io/papers/xjsnark.pdf, where the order of constraints is only O(n).
-        // This is because addition is not free, i.e., it makes constraints as well as multiplication, in the Plonk constraints system.
+        // This is because addition is not free, i.e., it makes constraints as well as
+        // multiplication, in the Plonk constraints system.
         let d0 = a.num_limbs();
         let d1 = b.num_limbs();
         let d = d0 + d1 - 1;
@@ -429,8 +460,9 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     ///
     /// # Return values
     /// Returns the square result `a^2` as [`AssignedInteger<F, Muled>`].
-    /// Its range type is [`Muled`] because its limb may overflow the maximum value of the [`Fresh`] type limb, i.e., `2^(self.limb_width)-1`.
-    /// Its number of limbs is equivalent to `2 * a.num_limbs() - 1`.
+    /// Its range type is [`Muled`] because its limb may overflow the maximum
+    /// value of the [`Fresh`] type limb, i.e., `2^(self.limb_width)-1`. Its
+    /// number of limbs is equivalent to `2 * a.num_limbs() - 1`.
     fn square(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -439,7 +471,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.mul(ctx, a, a)
     }
 
-    /// Given two inputs `a,b` and a modulus `n`, performs the modular addition `a + b mod n`.
+    /// Given two inputs `a,b` and a modulus `n`, performs the modular addition
+    /// `a + b mod n`.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -448,7 +481,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `n` - a modulus
     ///
     /// # Return values
-    /// Returns the modular addition result `a + b mod n` as [`AssignedInteger<F, Fresh>`].
+    /// Returns the modular addition result `a + b mod n` as
+    /// [`AssignedInteger<F, Fresh>`].
     ///
     /// # Requirements
     /// Before calling this function, you must assert that `a<n` and `b<n`.
@@ -461,9 +495,11 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     ) -> Result<AssignedInteger<F, Fresh>, Error> {
         // 1. Compute `a + b`.
         // 2. Compute `a + b - n`.
-        // 3. If the subtraction is overflowed, i.e., `a + b < n`, returns `a + b`. Otherwise, returns `a + b - n`.
+        // 3. If the subtraction is overflowed, i.e., `a + b < n`, returns `a + b`.
+        //    Otherwise, returns `a + b - n`.
         let mut added = self.add(ctx, a, b)?;
-        // The number of limbs of `subed` is `added.num_limbs() = max(a.num_limbs(), b.num_limbs()) + 1`.
+        // The number of limbs of `subed` is `added.num_limbs() = max(a.num_limbs(),
+        // b.num_limbs()) + 1`.
         let (subed, is_overflowed) = self.sub(ctx, &added, n)?;
         let num_limbs = subed.num_limbs();
         let zero_value = self.main_gate().assign_constant(ctx, F::ZERO)?;
@@ -475,15 +511,18 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
                     .select(ctx, &added.limb(i), &subed.limb(i), &is_overflowed)?;
             res_limbs.push(AssignedLimb::<_, Fresh>::from(val));
         }
-        for i in n.num_limbs()..num_limbs {
-            self.main_gate()
-                .assert_zero(ctx, &res_limbs[i].assigned_val())?;
+        let main_gate = self.main_gate(); // Avoid redundant function calls
+
+        for res_limb in res_limbs.iter().skip(n.num_limbs()) {
+            let assigned_val = res_limb.assigned_val(); // Avoid redundant access
+            main_gate.assert_zero(ctx, &assigned_val)?;
         }
         let res = AssignedInteger::new(&res_limbs[0..n.num_limbs()]);
         Ok(res)
     }
 
-    /// Given two inputs `a,b` and a modulus `n`, performs the modular subtraction `a - b mod n`.
+    /// Given two inputs `a,b` and a modulus `n`, performs the modular
+    /// subtraction `a - b mod n`.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -492,8 +531,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `n` - a modulus.
     ///
     /// # Return values
-    /// Returns the modular subtraction result `a - b mod n` as [`AssignedInteger<F, Fresh>`].
-    /// # Requirements
+    /// Returns the modular subtraction result `a - b mod n` as
+    /// [`AssignedInteger<F, Fresh>`]. # Requirements
     /// Before calling this function, you must assert that `a<n` and `b<n`.
     fn sub_mod(
         &self,
@@ -504,11 +543,13 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     ) -> Result<AssignedInteger<F, Fresh>, Error> {
         // 1. Compute `a - b`.
         // 2. Compute `n - (b - a) = a - b + n`.
-        // 3. If the subtraction in 1 is overflowed, i.e., `a - b < 0`, returns `a - b + n`. Otherwise, returns `a - b`.
+        // 3. If the subtraction in 1 is overflowed, i.e., `a - b < 0`, returns `a - b +
+        //    n`. Otherwise, returns `a - b`.
         // The number of limbs of `subed1` is `max(a.num_limbs(), b.num_limbs())`.
         let (mut subed1, is_overflowed1) = self.sub(ctx, a, b)?;
-        // If `is_overflowed1=1`, `subed2` is equal to `a - b + n` because `subed1` is `b - a` in that case.
-        // The number of limbs of `subed2` is `max(n.num_limbs(), subed1.num_limbs()) >= subed1.num_limbs()`.
+        // If `is_overflowed1=1`, `subed2` is equal to `a - b + n` because `subed1` is
+        // `b - a` in that case. The number of limbs of `subed2` is
+        // `max(n.num_limbs(), subed1.num_limbs()) >= subed1.num_limbs()`.
         let (subed2, is_overflowed2) = self.sub(ctx, n, &subed1)?;
         self.main_gate().assert_zero(ctx, &is_overflowed2)?;
         let num_limbs = subed2.num_limbs();
@@ -522,15 +563,18 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
                     .select(ctx, &subed2.limb(i), &subed1.limb(i), &is_overflowed1)?;
             res_limbs.push(AssignedLimb::<_, Fresh>::from(val));
         }
-        for i in n.num_limbs()..num_limbs {
-            self.main_gate()
-                .assert_zero(ctx, &res_limbs[i].assigned_val())?;
+        let main_gate = self.main_gate(); // Avoid redundant calls
+
+        for res_limb in res_limbs.iter().skip(n.num_limbs()) {
+            let assigned_val = res_limb.assigned_val();
+            main_gate.assert_zero(ctx, &assigned_val)?;
         }
         let res = AssignedInteger::new(&res_limbs[0..n.num_limbs()]);
         Ok(res)
     }
 
-    /// Given two inputs `a,b` and a modulus `n`, performs the modular multiplication `a * b mod n`.
+    /// Given two inputs `a,b` and a modulus `n`, performs the modular
+    /// multiplication `a * b mod n`.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -539,8 +583,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `n` - a modulus.
     ///
     /// # Return values
-    /// Returns the modular multiplication result `a * b mod n` as [`AssignedInteger<F, Fresh>`].
-    /// # Requirements
+    /// Returns the modular multiplication result `a * b mod n` as
+    /// [`AssignedInteger<F, Fresh>`]. # Requirements
     /// Before calling this function, you must assert that `a<n` and `b<n`.
     fn mul_mod(
         &self,
@@ -550,8 +594,10 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         n: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Fresh>, Error> {
         // The following constraints are designed with reference to AsymmetricMultiplierReducer template in https://github.com/jacksoom/circom-bigint/blob/master/circuits/mult.circom.
-        // However, we do not regroup multiple limbs like the circom-bigint implementation because addition is not free, i.e., it makes constraints as well as multiplication, in the Plonk constraints system.
-        // Besides, we use lookup tables to optimize range checks.
+        // However, we do not regroup multiple limbs like the circom-bigint
+        // implementation because addition is not free, i.e., it makes constraints as
+        // well as multiplication, in the Plonk constraints system. Besides, we
+        // use lookup tables to optimize range checks.
         let limb_width = self.limb_width;
         let n1 = a.num_limbs();
         let n2 = b.num_limbs();
@@ -569,7 +615,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
             .map(|(full_prod, n)| (&full_prod / &n, &full_prod % &n))
             .unzip();
 
-        // 3. Decompose the quotient and remainder into `self.limb_width` bits limb values.
+        // 3. Decompose the quotient and remainder into `self.limb_width` bits limb
+        //    values.
         let mut quotients = Vec::new();
         let mut prods = Vec::new();
         let limb_max = BigUint::from(1usize) << limb_width;
@@ -607,7 +654,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         let quotient_int = AssignedInteger::new(&quotient_limbs);
         let prod_int = AssignedInteger::new(&prod_limbs);
 
-        // 5. Assert `a * b = quotient_int * n + prod_int`, i.e., `prod_int = (a * b) mod n`.
+        // 5. Assert `a * b = quotient_int * n + prod_int`, i.e., `prod_int = (a * b)
+        //    mod n`.
         let ab = self.mul(ctx, a, b)?;
         let qn = self.mul(ctx, &quotient_int, n)?;
         let n_sum = n1 + n2;
@@ -631,7 +679,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         Ok(prod_int)
     }
 
-    /// Given a input `a` and a modulus `n`, performs the modular square `a^2 mod n`.
+    /// Given a input `a` and a modulus `n`, performs the modular square `a^2
+    /// mod n`.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -639,8 +688,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `n` - a modulus.
     ///
     /// # Return values
-    /// Returns the modular square result `a^2 mod n` as [`AssignedInteger<F, Fresh>`].
-    /// # Requirements
+    /// Returns the modular square result `a^2 mod n` as [`AssignedInteger<F,
+    /// Fresh>`]. # Requirements
     /// Before calling this function, you must assert that `a<n`.
     fn square_mod(
         &self,
@@ -651,7 +700,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.mul_mod(ctx, a, a, n)
     }
 
-    /// Given a base `a`, a variable exponent `e`, and a modulus `n`, performs the modular power `a^e mod n`.
+    /// Given a base `a`, a variable exponent `e`, and a modulus `n`, performs
+    /// the modular power `a^e mod n`.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -661,8 +711,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `exp_limb_bits` - the width of each limb when the e is decomposed.
     ///
     /// # Return values
-    /// Returns the modular power result `a^e mod n` as [`AssignedInteger<F, Fresh>`].
-    /// # Requirements
+    /// Returns the modular power result `a^e mod n` as [`AssignedInteger<F,
+    /// Fresh>`]. # Requirements
     /// Before calling this function, you must assert that `a<n`.
     fn pow_mod(
         &self,
@@ -687,7 +737,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         for e_bit in e_bits.into_iter() {
             // Compute `acc * squared`.
             let muled = self.mul_mod(ctx, &acc, &squared, n)?;
-            // If `e_bit = 1`, update `acc` to `acc * squared`. Otherwise, use the same `acc`.
+            // If `e_bit = 1`, update `acc` to `acc * squared`. Otherwise, use the same
+            // `acc`.
             for j in 0..acc.num_limbs() {
                 let selected = main_gate.select(ctx, &muled.limb(j), &acc.limb(j), &e_bit)?;
                 acc.replace_limb(j, AssignedLimb::from(selected));
@@ -698,7 +749,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         Ok(acc)
     }
 
-    /// Given a base `a`, a fixed exponent `e`, and a modulus `n`, performs the modular power `a^e mod n`.
+    /// Given a base `a`, a fixed exponent `e`, and a modulus `n`, performs the
+    /// modular power `a^e mod n`.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -707,8 +759,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `n` - a modulus.
     ///
     /// # Return values
-    /// Returns the modular power result `a^e mod n` as [`AssignedInteger<F, Fresh>`].
-    /// # Requirements
+    /// Returns the modular power result `a^e mod n` as [`AssignedInteger<F,
+    /// Fresh>`]. # Requirements
     /// Before calling this function, you must assert that `a<n`.
     fn pow_mod_fixed_exp(
         &self,
@@ -760,7 +812,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         a: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedValue<F>, Error> {
         let main_gate = self.main_gate();
-        // If all of the limbs of `a` are zero, `assigned_bit` is one. Otherwise, `assigned_bit` is zero.
+        // If all of the limbs of `a` are zero, `assigned_bit` is one. Otherwise,
+        // `assigned_bit` is zero.
         let mut assigned_bit = main_gate.assign_bit(ctx, Value::known(F::ONE))?;
         for limb in a.limbs().into_iter() {
             let is_zero = main_gate.is_zero(ctx, &limb.assigned_val())?;
@@ -769,7 +822,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         Ok(assigned_bit)
     }
 
-    /// Returns an assigned bit representing whether `a` and `b` are equivalent, whose [`RangeType`] is [`Fresh`].
+    /// Returns an assigned bit representing whether `a` and `b` are equivalent,
+    /// whose [`RangeType`] is [`Fresh`].
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -793,8 +847,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         let main_gate = self.main_gate();
         let mut eq_bit = main_gate.assign_bit(ctx, Value::known(F::ONE))?;
         for i in 0..max_n {
-            // If `i >= n1` or `i >= n1`, `i`-th limb value of the larger integer should be zero.
-            // Otherwise, their `i`-th limb value should be the same.
+            // If `i >= n1` or `i >= n1`, `i`-th limb value of the larger integer should be
+            // zero. Otherwise, their `i`-th limb value should be the same.
             let flag = if is_a_larger && i >= n2 {
                 main_gate.is_zero(ctx, &a.limb(i))?
             } else if !is_a_larger && i >= n1 {
@@ -807,7 +861,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         Ok(eq_bit)
     }
 
-    /// Returns an assigned bit representing whether `a` and `b` are equivalent, whose [`RangeType`] is [`Muled`].
+    /// Returns an assigned bit representing whether `a` and `b` are equivalent,
+    /// whose [`RangeType`] is [`Muled`].
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -816,7 +871,9 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `num_limbs_l` - a parameter to specify the number of limbs.
     /// * `num_limbs_r` - a parameter to specify the number of limbs.
     ///
-    /// If `a` (`b`) is the product of integers `l` and `r`, you must specify the lengths of the limbs of integers `l` and `r` as `num_limbs_l` and `num_limbs_l`, respectively.
+    /// If `a` (`b`) is the product of integers `l` and `r`, you must specify
+    /// the lengths of the limbs of integers `l` and `r` as `num_limbs_l` and
+    /// `num_limbs_l`, respectively.
     ///
     /// # Return values
     /// Returns the assigned bit as `AssignedValue<F>`.
@@ -837,7 +894,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         } else {
             num_limbs_r
         };
-        // Each limb of `a` and `b` is less than `min_n * (1^(limb_width) - 1)^2  + (1^(limb_width) - 1)`.
+        // Each limb of `a` and `b` is less than `min_n * (1^(limb_width) - 1)^2  +
+        // (1^(limb_width) - 1)`.
         let word_max = Self::compute_mul_word_max(self.limb_width, min_n);
         let limb_width = self.limb_width;
         let num_limbs = num_limbs_l + num_limbs_r - 1;
@@ -872,7 +930,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
             accumulated_extra =
                 main_gate.add_constant(ctx, &accumulated_extra, big_to_fe(word_max.clone()))?;
             let (q_acc, mod_acc) = self.div_mod_main_gate(ctx, &accumulated_extra, &limb_max)?;
-            // If and only if `a` is equal to `b`, lower `self.limb_width` bits of `sum` and `accumulated_extra` are the same.
+            // If and only if `a` is equal to `b`, lower `self.limb_width` bits of `sum` and
+            // `accumulated_extra` are the same.
             let cs_acc_eq = main_gate.is_equal(ctx, &cs[i], &mod_acc)?;
             eq_bit = main_gate.and(ctx, &eq_bit, &cs_acc_eq)?;
             accumulated_extra = q_acc;
@@ -897,7 +956,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         Ok(eq_bit)
     }
 
-    /// Returns an assigned bit representing whether `a` is less than `b` (`a<b`).
+    /// Returns an assigned bit representing whether `a` is less than `b`
+    /// (`a<b`).
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -921,7 +981,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.main_gate().and(ctx, &is_overflowed, &is_not_eq)
     }
 
-    /// Returns an assigned bit representing whether `a` is less than or equal to `b` (`a<=b`).
+    /// Returns an assigned bit representing whether `a` is less than or equal
+    /// to `b` (`a<=b`).
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -943,7 +1004,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         Ok(is_overflowed)
     }
 
-    /// Returns an assigned bit representing whether `a` is greater than `b` (`a>b`).
+    /// Returns an assigned bit representing whether `a` is greater than `b`
+    /// (`a>b`).
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -965,7 +1027,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.main_gate().not(ctx, &is_less_than_or_eq)
     }
 
-    /// Returns an assigned bit representing whether `a` is greater than or equal to `b` (`a>=b`).
+    /// Returns an assigned bit representing whether `a` is greater than or
+    /// equal to `b` (`a>=b`).
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -987,7 +1050,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.main_gate().not(ctx, &is_less_than)
     }
 
-    /// Returns an assigned bit representing whether `a` is in the order-`n` finite field.
+    /// Returns an assigned bit representing whether `a` is in the order-`n`
+    /// finite field.
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -996,8 +1060,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     ///
     /// # Return values
     /// Returns the assigned bit as `AssignedValue<F>`.
-    /// If `a` is in the order-`n` finite field, in other words `a<n`, the bit is equivalent to one.
-    /// Otherwise, the bit is equivalent to zero.
+    /// If `a` is in the order-`n` finite field, in other words `a<n`, the bit
+    /// is equivalent to one. Otherwise, the bit is equivalent to zero.
     fn is_in_field(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -1025,7 +1089,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.main_gate().assert_one(ctx, &eq_bit)
     }
 
-    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is [`Fresh`].
+    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is
+    /// [`Fresh`].
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -1044,7 +1109,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
         self.main_gate().assert_one(ctx, &eq_bit)
     }
 
-    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is [`Muled`].
+    /// Asserts that `a` and `b` are equivalent, whose [`RangeType`] is
+    /// [`Muled`].
     ///
     /// # Arguments
     /// * `ctx` - a region context.
@@ -1149,7 +1215,8 @@ impl<F: PrimeField> BigIntInstructions<F> for BigIntChip<F> {
     /// * `n` - a modulus.
     ///
     /// # Return values
-    /// Returns [`Error`] if `a` is not in the order-`n` finite field, i.e., `a>=n`.
+    /// Returns [`Error`] if `a` is not in the order-`n` finite field, i.e.,
+    /// `a>=n`.
     fn assert_in_field(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -1171,7 +1238,8 @@ impl<F: PrimeField> BigIntChip<F> {
     /// # Arguments
     /// * config - a configuration for [`BigIntChip`].
     /// * limb_width - the bit length of [`Fresh`] type limbs in this chip.
-    /// * bits_len - the default bit length of [`Fresh`] type integers in this chip.
+    /// * bits_len - the default bit length of [`Fresh`] type integers in this
+    ///   chip.
     ///
     /// # Return values
     /// Returns a new [`BigIntChip`]
@@ -1220,14 +1288,17 @@ impl<F: PrimeField> BigIntChip<F> {
         AssignedInteger::new(limbs)
     }
 
-    /// Returns the bit length parameters necessary to configure the [`RangeChip`].
+    /// Returns the bit length parameters necessary to configure the
+    /// [`RangeChip`].
     ///
     /// # Arguments
     /// * limb_width - the bit length of [`Fresh`] limbs.
     /// * num_limbs - the default number of limbs of [`Fresh`] integers.
     ///
     /// # Return values
-    /// Returns a vector of composition bit lengthes (`composition_bit_lens`) and a vector of overflow bit lengthes (`overflow_bit_lens`), which are necessary for [`RangeConfig`].
+    /// Returns a vector of composition bit lengthes (`composition_bit_lens`)
+    /// and a vector of overflow bit lengthes (`overflow_bit_lens`), which are
+    /// necessary for [`RangeConfig`].
     pub fn compute_range_lens(limb_width: usize, num_limbs: usize) -> (Vec<usize>, Vec<usize>) {
         let out_comp_bit_len = limb_width / BigIntChip::<F>::NUM_LOOKUP_LIMBS;
         let out_overflow_bit_len = limb_width % out_comp_bit_len;
@@ -1301,7 +1372,8 @@ impl<F: PrimeField> BigIntChip<F> {
         b: &AssignedInteger<F, Fresh>,
     ) -> Result<AssignedInteger<F, Fresh>, Error> {
         let limb_width = self.limb_width;
-        // If `a.num_limbs() < b.num_limbs()`, in other words `a < b`, this function will panic.
+        // If `a.num_limbs() < b.num_limbs()`, in other words `a < b`, this function
+        // will panic.
         assert!(a.num_limbs() >= b.num_limbs());
         let max_n = a.num_limbs();
         let range_chip = self.range_chip();
@@ -1364,7 +1436,8 @@ impl<F: PrimeField> BigIntChip<F> {
         val.bits() as usize
     }
 
-    /// Returns the bit length of the sublimb necessary to check the range of the `bit_len_limb`-bits integer with [`RangeChip`].
+    /// Returns the bit length of the sublimb necessary to check the range of
+    /// the `bit_len_limb`-bits integer with [`RangeChip`].
     fn sublimb_bit_len(bit_len_limb: usize) -> usize {
         //assert!(bit_len_limb % Self::NUM_LOOKUP_LIMBS == 0);
         let val = bit_len_limb / Self::NUM_LOOKUP_LIMBS;
@@ -1389,15 +1462,13 @@ mod test {
 
     //zeroknight
     use ff::{Field, FromUniformBytes};
-
-    use crate::big_pow_mod;
-
-    use super::*;
-
     use halo2wrong::halo2::{
         circuit::SimpleFloorPlanner,
         plonk::{Circuit, ConstraintSystem},
     };
+
+    use super::*;
+    use crate::big_pow_mod;
 
     macro_rules! impl_bigint_test_circuit {
         ($circuit_name:ident, $test_fn_name:ident, $limb_width:expr, $bits_len:expr, $should_be_error:expr, $( $synth:tt )*) => {

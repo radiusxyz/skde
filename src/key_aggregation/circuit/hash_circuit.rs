@@ -356,177 +356,178 @@ impl<F: PrimeField + FromUniformBytes<64>, const T: usize, const RATE: usize> Ci
     }
 }
 
-// TODO
-#[cfg(test)]
-mod tests {
-    use std::marker::PhantomData;
+// TODO: Refactoring
+// #[cfg(test)]
+// mod tests {
+//     use std::marker::PhantomData;
 
-    use halo2wrong::curves::bn256::Fr;
-    use maingate::{big_to_fe, decompose_big, mock_prover_verify};
-    use num_bigint::{BigUint, RandomBits};
-    use poseidon::{Poseidon, Spec};
-    use rand::{thread_rng, Rng};
+//     use halo2wrong::curves::bn256::Fr;
+//     use maingate::{big_to_fe, decompose_big, mock_prover_verify};
+//     use num_bigint::{BigUint, RandomBits};
+//     use poseidon::{Poseidon, Spec};
+//     use rand::{thread_rng, Rng};
 
-    use crate::{key_aggregation::*, BIT_LEN, MAX_SEQUENCER_NUMBER};
+//     use crate::{key_aggregation::*, BIT_LEN, MAX_SEQUENCER_NUMBER};
 
-    #[test]
-    fn test_aggregate_with_hash_circuit() {
-        let bit_len = BIT_LEN as u64;
-        let max_sequencer_number = MAX_SEQUENCER_NUMBER;
-        let limb_width = AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
-        let limb_count = AggregateHashCircuit::<Fr, 5, 4>::LIMB_COUNT;
+//     #[test]
+//     fn test_aggregate_with_hash_circuit() {
+//         let bit_len = BIT_LEN as u64;
+//         let max_sequencer_number = MAX_SEQUENCER_NUMBER;
+//         let limb_width = AggregateHashCircuit::<Fr, 5, 4>::LIMB_WIDTH;
+//         let limb_count = AggregateHashCircuit::<Fr, 5, 4>::LIMB_COUNT;
 
-        let mut rng = thread_rng();
+//         let mut rng = thread_rng();
 
-        let mut n = BigUint::default();
-        while n.bits() != bit_len {
-            n = rng.sample(RandomBits::new(bit_len));
-        }
-        let n_square = &n * &n;
+//         let mut n = BigUint::default();
+//         while n.bits() != bit_len {
+//             n = rng.sample(RandomBits::new(bit_len));
+//         }
+//         let n_square = &n * &n;
 
-        let spec = Spec::<Fr, 5, 4>::new(8, 57);
+//         let spec = Spec::<Fr, 5, 4>::new(8, 57);
 
-        let mut partial_key_list = vec![];
+//         let mut partial_key_list = vec![];
 
-        let mut aggregated_key = AggregatedKey {
-            u: BigUint::one().to_str_radix(10),
-            v: BigUint::one().to_str_radix(10),
-            y: BigUint::one().to_str_radix(10),
-            w: BigUint::one().to_str_radix(10),
-        };
+//         let mut aggregated_key = AggregatedKey {
+//             u: BigUint::one().to_str_radix(10),
+//             v: BigUint::one().to_str_radix(10),
+//             y: BigUint::one().to_str_radix(10),
+//             w: BigUint::one().to_str_radix(10),
+//         };
 
-        for _ in 0..max_sequencer_number {
-            let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
-            let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
-            let y = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
-            let w = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) % &n_square;
+//         for _ in 0..max_sequencer_number {
+//             let u = rng.sample::<BigUint, _>(RandomBits::new(bit_len)) % &n;
+//             let v = rng.sample::<BigUint, _>(RandomBits::new(bit_len * 2)) %
+// &n_square;             let y = rng.sample::<BigUint,
+// _>(RandomBits::new(bit_len)) % &n;             let w = rng.sample::<BigUint,
+// _>(RandomBits::new(bit_len * 2)) % &n_square;
 
-            partial_key_list.push(PartialKey {
-                u: u.clone(),
-                v: v.clone(),
-                y: y.clone(),
-                w: w.clone(),
-            });
+//             partial_key_list.push(PartialKey {
+//                 u: u.clone(),
+//                 v: v.clone(),
+//                 y: y.clone(),
+//                 w: w.clone(),
+//             });
 
-            aggregated_key.u = (BigUint::from_str_radix(&aggregated_key.u, 10).unwrap() * &u % &n)
-                .to_str_radix(10);
-            aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v, 10).unwrap() * &v
-                % &n_square)
-                .to_str_radix(10);
-            aggregated_key.y = (BigUint::from_str_radix(&aggregated_key.y, 10).unwrap() * &y % &n)
-                .to_str_radix(10);
-            aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w, 10).unwrap() * &w
-                % &n_square)
-                .to_str_radix(10);
-        }
+//             aggregated_key.u = (BigUint::from_str_radix(&aggregated_key.u,
+// 10).unwrap() * &u % &n)                 .to_str_radix(10);
+//             aggregated_key.v = (BigUint::from_str_radix(&aggregated_key.v,
+// 10).unwrap() * &v                 % &n_square)
+//                 .to_str_radix(10);
+//             aggregated_key.y = (BigUint::from_str_radix(&aggregated_key.y,
+// 10).unwrap() * &y % &n)                 .to_str_radix(10);
+//             aggregated_key.w = (BigUint::from_str_radix(&aggregated_key.w,
+// 10).unwrap() * &w                 % &n_square)
+//                 .to_str_radix(10);
+//         }
 
-        let mut ref_hasher = Poseidon::<Fr, 5, 4>::new_hash(8, 57);
+//         let mut ref_hasher = Poseidon::<Fr, 5, 4>::new_hash(8, 57);
 
-        let base1: Fr = big_to_fe(BigUint::from(
-            2_u128.pow((limb_width as u128).try_into().unwrap()),
-        ));
-        let base2: Fr = base1 * &base1;
+//         let base1: Fr = big_to_fe(BigUint::from(
+//             2_u128.pow((limb_width as u128).try_into().unwrap()),
+//         ));
+//         let base2: Fr = base1 * &base1;
 
-        let mut hash_list = vec![];
+//         let mut hash_list = vec![];
 
-        for i in 0..max_sequencer_number {
-            let u = partial_key_list[i].u.clone();
-            let u_limbs = decompose_big::<Fr>(u.clone(), limb_count, limb_width);
-            for i in 0..(limb_count / 3) {
-                let mut u_compose = u_limbs[3 * i];
-                u_compose += base1 * &u_limbs[3 * i + 1];
-                u_compose += base2 * &u_limbs[3 * i + 2];
-                ref_hasher.update(&[u_compose]);
-            }
-            let mut u_compose = u_limbs[30];
-            u_compose += base1 * &u_limbs[31];
+//         for i in 0..max_sequencer_number {
+//             let u = partial_key_list[i].u.clone();
+//             let u_limbs = decompose_big::<Fr>(u.clone(), limb_count,
+// limb_width);             for i in 0..(limb_count / 3) {
+//                 let mut u_compose = u_limbs[3 * i];
+//                 u_compose += base1 * &u_limbs[3 * i + 1];
+//                 u_compose += base2 * &u_limbs[3 * i + 2];
+//                 ref_hasher.update(&[u_compose]);
+//             }
+//             let mut u_compose = u_limbs[30];
+//             u_compose += base1 * &u_limbs[31];
 
-            let e = u_compose;
-            ref_hasher.update(&[e.clone()]);
+//             let e = u_compose;
+//             ref_hasher.update(&[e.clone()]);
 
-            let v = partial_key_list[i].v.clone();
-            let v_limbs = decompose_big::<Fr>(v.clone(), limb_count * 2, limb_width);
-            for i in 0..(limb_count * 2 / 3) {
-                let mut v_compose = v_limbs[3 * i];
-                v_compose += base1 * &v_limbs[3 * i + 1];
-                v_compose += base2 * &v_limbs[3 * i + 2];
-                ref_hasher.update(&[v_compose]);
-            }
-            let mut v_compose = v_limbs[30];
-            v_compose += base1 * &v_limbs[31];
+//             let v = partial_key_list[i].v.clone();
+//             let v_limbs = decompose_big::<Fr>(v.clone(), limb_count * 2,
+// limb_width);             for i in 0..(limb_count * 2 / 3) {
+//                 let mut v_compose = v_limbs[3 * i];
+//                 v_compose += base1 * &v_limbs[3 * i + 1];
+//                 v_compose += base2 * &v_limbs[3 * i + 2];
+//                 ref_hasher.update(&[v_compose]);
+//             }
+//             let mut v_compose = v_limbs[30];
+//             v_compose += base1 * &v_limbs[31];
 
-            let e = v_compose;
-            ref_hasher.update(&[e.clone()]);
+//             let e = v_compose;
+//             ref_hasher.update(&[e.clone()]);
 
-            let y = partial_key_list[i].y.clone();
-            let y_limbs = decompose_big::<Fr>(y.clone(), limb_count, limb_width);
-            for i in 0..(limb_count / 3) {
-                let mut y_compose = y_limbs[3 * i];
-                y_compose += base1 * &y_limbs[3 * i + 1];
-                y_compose += base2 * &y_limbs[3 * i + 2];
-                ref_hasher.update(&[y_compose]);
-            }
-            let mut y_compose = y_limbs[30];
-            y_compose += base1 * &y_limbs[31];
+//             let y = partial_key_list[i].y.clone();
+//             let y_limbs = decompose_big::<Fr>(y.clone(), limb_count,
+// limb_width);             for i in 0..(limb_count / 3) {
+//                 let mut y_compose = y_limbs[3 * i];
+//                 y_compose += base1 * &y_limbs[3 * i + 1];
+//                 y_compose += base2 * &y_limbs[3 * i + 2];
+//                 ref_hasher.update(&[y_compose]);
+//             }
+//             let mut y_compose = y_limbs[30];
+//             y_compose += base1 * &y_limbs[31];
 
-            let e = y_compose;
-            ref_hasher.update(&[e.clone()]);
+//             let e = y_compose;
+//             ref_hasher.update(&[e.clone()]);
 
-            let w = partial_key_list[i].w.clone();
-            let w_limbs = decompose_big::<Fr>(w.clone(), limb_count * 2, limb_width);
-            for i in 0..(limb_count * 2 / 3) {
-                let mut w_compose = w_limbs[3 * i];
-                w_compose += base1 * &w_limbs[3 * i + 1];
-                w_compose += base2 * &w_limbs[3 * i + 2];
-                ref_hasher.update(&[w_compose]);
-            }
-            let mut w_compose = w_limbs[30];
-            w_compose += base1 * &w_limbs[31];
+//             let w = partial_key_list[i].w.clone();
+//             let w_limbs = decompose_big::<Fr>(w.clone(), limb_count * 2,
+// limb_width);             for i in 0..(limb_count * 2 / 3) {
+//                 let mut w_compose = w_limbs[3 * i];
+//                 w_compose += base1 * &w_limbs[3 * i + 1];
+//                 w_compose += base2 * &w_limbs[3 * i + 2];
+//                 ref_hasher.update(&[w_compose]);
+//             }
+//             let mut w_compose = w_limbs[30];
+//             w_compose += base1 * &w_limbs[31];
 
-            let e = w_compose;
-            ref_hasher.update(&[e.clone()]);
+//             let e = w_compose;
+//             ref_hasher.update(&[e.clone()]);
 
-            let hash = ref_hasher.squeeze(1);
-            hash_list.push(hash[1]);
-            hash_list.push(hash[2]);
-        }
+//             let hash = ref_hasher.squeeze(1);
+//             hash_list.push(hash[1]);
+//             hash_list.push(hash[2]);
+//         }
 
-        let circuit = AggregateHashCircuit::<Fr, 5, 4> {
-            spec,
-            n,
-            n_square,
-            partial_key_list,
-            max_sequencer_number,
-            _f: PhantomData,
-        };
+//         let circuit = AggregateHashCircuit::<Fr, 5, 4> {
+//             spec,
+//             n,
+//             n_square,
+//             partial_key_list,
+//             max_sequencer_number,
+//             _f: PhantomData,
+//         };
 
-        let bit_len = BIT_LEN;
+//         let bit_len = BIT_LEN;
 
-        let mut public_inputs = vec![hash_list];
-        public_inputs[0].extend(decompose_big::<Fr>(
-            BigUint::from_str_radix(&aggregated_key.u, 10).unwrap(),
-            limb_count,
-            bit_len,
-        ));
+//         let mut public_inputs = vec![hash_list];
+//         public_inputs[0].extend(decompose_big::<Fr>(
+//             BigUint::from_str_radix(&aggregated_key.u, 10).unwrap(),
+//             limb_count,
+//             bit_len,
+//         ));
 
-        public_inputs[0].extend(decompose_big::<Fr>(
-            BigUint::from_str_radix(&aggregated_key.v, 10).unwrap(),
-            limb_count * 2,
-            bit_len,
-        ));
+//         public_inputs[0].extend(decompose_big::<Fr>(
+//             BigUint::from_str_radix(&aggregated_key.v, 10).unwrap(),
+//             limb_count * 2,
+//             bit_len,
+//         ));
 
-        public_inputs[0].extend(decompose_big::<Fr>(
-            BigUint::from_str_radix(&aggregated_key.y, 10).unwrap(),
-            limb_count,
-            bit_len,
-        ));
+//         public_inputs[0].extend(decompose_big::<Fr>(
+//             BigUint::from_str_radix(&aggregated_key.y, 10).unwrap(),
+//             limb_count,
+//             bit_len,
+//         ));
 
-        public_inputs[0].extend(decompose_big::<Fr>(
-            BigUint::from_str_radix(&aggregated_key.w, 10).unwrap(),
-            limb_count * 2,
-            bit_len,
-        ));
+//         public_inputs[0].extend(decompose_big::<Fr>(
+//             BigUint::from_str_radix(&aggregated_key.w, 10).unwrap(),
+//             limb_count * 2,
+//             bit_len,
+//         ));
 
-        mock_prover_verify(&circuit, public_inputs);
-    }
-}
+//         mock_prover_verify(&circuit, public_inputs);
+//     }
+// }

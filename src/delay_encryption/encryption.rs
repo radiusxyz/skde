@@ -1,16 +1,57 @@
 use std::io::Write;
 
-use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod};
+use big_integer::{big_mod_inv, big_mul_mod, big_pow_mod, mod_exp_by_pow_of_two};
 use num_bigint::{BigUint, RandBigInt};
+use num_prime::RandPrime;
 use num_traits::{FromBytes, Num};
 use rand::thread_rng;
 
 use crate::{
     delay_encryption::{CipherPair, Ciphertext},
-    SkdeParams,
+    SkdeParams, BIT_LEN,
 };
 
 const CHUNK_SIZE: usize = 64;
+
+/// Sets up the parameters for the SKDE (Secure Key Delay Encryption) scheme.
+///
+/// # Arguments
+/// * `t` - Delay parameter for time-lock encryption (number of squarings = 2^t)
+/// * `g` - Generator used for exponentiation
+/// * `max_sequencer_number` - The maximum number of sequencers allowed
+///
+/// # Returns
+/// * `SkdeParams` - The full public parameters used in the
+///   encryption/decryption process
+///
+/// # Security Note
+/// This function generates two large safe primes `p` and `q`, and computes `n =
+/// p * q`, which is used as the RSA modulus. The bit length of `n` is defined
+/// by `BIT_LEN` (2048 bits), which is standard for cryptographic security. The
+/// function also computes `h = g^(2^t) mod n`, which is used in time-lock
+/// puzzle computation.
+///
+/// # Performance Note
+/// Generating safe primes is a computationally expensive operation.
+/// Depending on the machine specifications and the bit length,
+/// this setup may take from several minutes to even a few hours.
+pub fn setup(t: u32, g: BigUint, max_sequencer_number: BigUint) -> SkdeParams {
+    let mut rng = rand::thread_rng();
+
+    let p: BigUint = rng.gen_safe_prime_exact(BIT_LEN / 2);
+    let q: BigUint = rng.gen_safe_prime_exact(BIT_LEN / 2);
+
+    let n = p * q;
+    let h = mod_exp_by_pow_of_two(&g, t, &n);
+
+    SkdeParams {
+        t,
+        n: n.to_str_radix(10),
+        g: g.to_str_radix(10),
+        h: h.to_str_radix(10),
+        max_sequencer_number: max_sequencer_number.to_str_radix(10),
+    }
+}
 
 /// Return the encrypted message as hexadecimal string.
 ///
@@ -38,7 +79,7 @@ pub fn encrypt(
 fn encrypt_slice(skde_params: &SkdeParams, slice: &[u8], encryption_key: &str) -> CipherPair {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
-    let pk = BigUint::from_str_radix(&encryption_key, 10).unwrap();
+    let pk = BigUint::from_str_radix(encryption_key, 10).unwrap();
 
     let plain_text = BigUint::from_be_bytes(slice);
     let mut rng = thread_rng();
@@ -104,7 +145,7 @@ fn decrypt_inner(
     let c1 = BigUint::from_str_radix(&cipher_pair.c1, 10).unwrap();
     let c2 = BigUint::from_str_radix(&cipher_pair.c2, 10).unwrap();
 
-    let sk = BigUint::from_str_radix(&decryption_key, 10).unwrap();
+    let sk = BigUint::from_str_radix(decryption_key, 10).unwrap();
 
     let exponentiation = big_pow_mod(&c1, &sk, &n);
 
