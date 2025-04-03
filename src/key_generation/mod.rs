@@ -12,6 +12,20 @@ pub use types::*;
 
 use crate::SkdeParams;
 
+/// Generates a (secret value, partial public key) pair for SKDE.
+///
+/// # Overview
+/// - Chooses three random secrets: r, s, k
+/// - Computes two (u, v) pairs using SKDE parameters:
+///   - (u, v) = g^r, h^{(r+s)n} * (1 + n)^s
+///   - (y, w) = g^k, h^{rn} * (1 + n)^r
+///
+/// # Returns
+/// - SecretValue { r, s, k }
+/// - PartialKey { u, v, y, w }
+///
+/// These values are later aggregated by multiple parties for threshold
+/// encryption.
 pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKey) {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let max_sequencer_number =
@@ -39,8 +53,18 @@ pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKe
     )
 }
 
-// Input: (a, b, skde_params = (n, g, t, h))
-// Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
+/// Computes a single (u, v) pair from SKDE parameters and inputs (a, b).
+///
+/// # Inputs
+/// - a: random scalar used as exponent for g and h
+/// - b: random scalar used in (1 + n)^b
+/// - skde_params = (n, g, t, h)
+///
+/// # Outputs
+/// - u = g^a mod n
+/// - v = (1 + n)^b * h^{a * n} mod n^2
+///
+/// This function is used to generate (u, v) and (y, w) values for partial keys.
 pub fn generate_uv_pair(skde_params: &SkdeParams, a: &BigUint, b: &BigUint) -> UVPair {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();

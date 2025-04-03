@@ -4,6 +4,9 @@ use maingate::{decompose_big, halo2::circuit::Value};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
+/// Represents the secret values used to construct a `PartialKey`.
+/// These are sampled randomly by each sequencer:
+/// - `r`, `s`, `k` are scalar values used in the SKDE protocol.
 #[derive(Debug, Clone)]
 pub struct SecretValue {
     pub r: BigUint,
@@ -11,6 +14,9 @@ pub struct SecretValue {
     pub k: BigUint,
 }
 
+/// Represents a sequencer's public partial key contribution in SKDE:
+/// - `u`, `v` are computed from (r + s, s)
+/// - `y`, `w` are computed from (k, r)
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialKey {
     pub u: BigUint,
@@ -20,6 +26,8 @@ pub struct PartialKey {
 }
 
 impl PartialKey {
+    // Decomposes each component (u, v, y, w) of the PartialKey
+    /// into field elements using `limb_width` and `limb_count`.
     pub fn decompose_partial_key<F: PrimeField>(
         partial_key: &PartialKey,
         limb_width: usize,
