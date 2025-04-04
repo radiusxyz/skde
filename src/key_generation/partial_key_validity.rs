@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 
 use super::{
+    errors::KeyGenerationError,
     generate_uv_pair,
     types::{PartialKey, SecretValue},
 };
@@ -29,7 +30,7 @@ pub struct PartialKeyProof {
 pub fn prove_partial_key_validity(
     skde_params: &SkdeParams,
     secret_value: &SecretValue,
-) -> PartialKeyProof {
+) -> Result<PartialKeyProof, KeyGenerationError> {
     let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
     let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
     let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
@@ -54,7 +55,7 @@ pub fn prove_partial_key_validity(
     let l = generate_random_biguint(&l_range);
     let x = generate_random_biguint(&x_range);
 
-    let ab_pair = generate_uv_pair(skde_params, &x, &l);
+    let ab_pair = generate_uv_pair(skde_params, &x, &l)?;
 
     let a = ab_pair.u;
     let b = ab_pair.v;
@@ -69,13 +70,13 @@ pub fn prove_partial_key_validity(
     let alpha = (r + s + k) * &e + &x;
     let beta = (r + s) * &e + &l;
 
-    PartialKeyProof {
+    Ok(PartialKeyProof {
         a,
         b,
         tau,
         alpha,
         beta,
-    }
+    })
 }
 
 pub fn verify_partial_key_validity(

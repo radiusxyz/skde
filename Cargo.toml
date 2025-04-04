@@ -37,6 +37,7 @@ const-hex = "1.12"
 num-prime = "0.4.4"
 aes-gcm = "0.10"
 risc0-zkvm = { version = "1.0.5", features = ["prove", "std"] }
+thiserror = "2.0.12"
 
 [workspace.dependencies]
 serde = { version = "1.0.197", features = ["derive"] }

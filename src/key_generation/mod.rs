@@ -1,3 +1,4 @@
+mod errors;
 mod partial_key_validity;
 mod range_proof;
 mod types;
@@ -13,11 +14,20 @@ pub use range_proof::*;
 pub use types::*;
 
 use crate::SkdeParams;
+use errors::KeyGenerationError;
 
-pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKey) {
-    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
-    let max_sequencer_number =
-        BigUint::from_str_radix(&skde_params.max_sequencer_number, 10).unwrap();
+pub fn generate_partial_key(
+    skde_params: &SkdeParams,
+) -> Result<(SecretValue, PartialKey), KeyGenerationError> {
+    let n = BigUint::from_str_radix(&skde_params.n, 10)
+        .map_err(|e| KeyGenerationError::BigUintParseError(format!("Failed to parse n: {}", e)))?;
+    let max_sequencer_number = BigUint::from_str_radix(&skde_params.max_sequencer_number, 10)
+        .map_err(|e| {
+            KeyGenerationError::BigUintParseError(format!(
+                "Failed to parse max_sequencer_number: {}",
+                e
+            ))
+        })?;
     let two_big: BigUint = BigUint::from(2u32);
 
     let n_half: BigUint = &n / two_big;
@@ -27,10 +37,10 @@ pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKe
     let s = generate_random_biguint(&n_half_over_m);
     let k = generate_random_biguint(&n_half);
 
-    let uv_pair = generate_uv_pair(skde_params, &(&r + &s), &s);
-    let yw_pair = generate_uv_pair(skde_params, &k, &r);
+    let uv_pair = generate_uv_pair(skde_params, &(&r + &s), &s)?;
+    let yw_pair = generate_uv_pair(skde_params, &k, &r)?;
 
-    (
+    Ok((
         SecretValue { r, s, k },
         PartialKey {
             u: uv_pair.u,
@@ -38,17 +48,23 @@ pub fn generate_partial_key(skde_params: &SkdeParams) -> (SecretValue, PartialKe
             y: yw_pair.u,
             w: yw_pair.v,
         },
-    )
+    ))
 }
 
 // Input: (a, b, skde_params = (n, g, t, h))
 // Output: (u = g^a, v = h^{a * n} * (1 + n)^b)
-pub fn generate_uv_pair(skde_params: &SkdeParams, a: &BigUint, b: &BigUint) -> UVPair {
-    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
-    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
-    let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
+pub fn generate_uv_pair(
+    skde_params: &SkdeParams,
+    a: &BigUint,
+    b: &BigUint,
+) -> Result<UVPair, KeyGenerationError> {
+    let n = BigUint::from_str_radix(&skde_params.n, 10)
+        .map_err(|e| KeyGenerationError::BigUintParseError(format!("Failed to parse n: {}", e)))?;
+    let g = BigUint::from_str_radix(&skde_params.g, 10)
+        .map_err(|e| KeyGenerationError::BigUintParseError(format!("Failed to parse g: {}", e)))?;
+    let h = BigUint::from_str_radix(&skde_params.h, 10)
+        .map_err(|e| KeyGenerationError::BigUintParseError(format!("Failed to parse h: {}", e)))?;
 
-    // let lambda = n.bits() / 2 + 1;
     let n_square = &n * &n;
     let n_plus_one = &n + BigUint::one();
 
@@ -62,7 +78,7 @@ pub fn generate_uv_pair(skde_params: &SkdeParams, a: &BigUint, b: &BigUint) -> U
     // v = (n+1)^s * hrn mod n^2
     let v = (&big_pow_mod(&n_plus_one, b, &n_square) * &h_exp_an) % &n_square;
 
-    UVPair { u, v }
+    Ok(UVPair { u, v })
 }
 
 pub fn assign_partial_key<F: PrimeField>(

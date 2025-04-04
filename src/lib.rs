@@ -28,8 +28,9 @@ mod tests {
         delay_encryption::{decrypt, encrypt, setup, solve_time_lock_puzzle, SkdeParams},
         key_aggregation::aggregate_key,
         key_generation::{
-            generate_partial_key, generate_range_proof, prove_partial_key_validity, setup_env,
-            setup_inputs, verify_partial_key_validity, verify_proof,
+            generate_partial_key, generate_range_proof, prove_partial_key_validity,
+            verify_partial_key_validity, verify_proof, RangeProofInput, BASE, EXPONENT, MODULUS,
+            RANGE,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };
@@ -64,6 +65,14 @@ mod tests {
         }
     }
 
+    fn setup_default_input() -> RangeProofInput {
+        RangeProofInput::new(
+            BigUint::from_str(BASE).expect("Invalid number for Base"),
+            BigUint::from_str(MODULUS).expect("Invalid number for Modulus"),
+            BigUint::from_str(RANGE).expect("Invalid number for Range"),
+        )
+    }
+
     /// Generates a random ASCII string of the specified byte length.
     /// Only characters (A-Z, a-z, 0-9) are used.
     /// Therefore, a string of length `len` is exactly `len` bytes in size
@@ -91,8 +100,8 @@ mod tests {
         // Generate partial keys & Verify all
         let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
             .map(|_| {
-                let (secret, partial) = generate_partial_key(&skde_params);
-                let proof = prove_partial_key_validity(&skde_params, &secret);
+                let (secret, partial) = generate_partial_key(&skde_params).unwrap();
+                let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
                 assert!(verify_partial_key_validity(
                     &skde_params,
                     partial.clone(),
@@ -135,11 +144,24 @@ mod tests {
     }
 
     #[test]
-    fn test_range_proof() {
-        let (base, modulus, range, result) = setup_inputs();
-        let env = setup_env(&base, &modulus, &range, &result);
-        let proof = generate_range_proof(env);
-        verify_proof(&proof.receipt);
+    fn test_generate_and_verify_range_proof() {
+        // Test small bits
+        let exponent = BigUint::from_str(EXPONENT).expect("Invalid number for Exponent");
+
+        let input = RangeProofInput {
+            base: BigUint::from_str("4").unwrap(),
+            modulus: BigUint::from_str("6").unwrap(),
+            range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
+        };
+        let proof = generate_range_proof(&input).unwrap();
+        let u = input.base.modpow(&exponent, &input.modulus);
+        verify_proof(u, &proof.receipt).unwrap();
+
+        // Test 2048-bits
+        let input = setup_default_input();
+        let proof = generate_range_proof(&input).unwrap();
+        let u = input.base.modpow(&exponent, &input.modulus);
+        verify_proof(u, &proof.receipt).unwrap();
     }
 
     /// Tests the correctness of the `setup` function and generated parameters.
