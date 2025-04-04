@@ -4,8 +4,10 @@ pub use num_bigint::BigUint;
 pub use num_prime::RandPrime;
 
 pub mod delay_encryption;
+pub mod errors;
 pub mod key_aggregation;
 pub mod key_generation;
+pub mod range_proof;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
 pub const BIT_LEN: usize = 2048; // n's bit length
@@ -28,9 +30,10 @@ mod tests {
         delay_encryption::{decrypt, encrypt, setup, solve_time_lock_puzzle, SkdeParams},
         key_aggregation::aggregate_key,
         key_generation::{
-            generate_partial_key, generate_range_proof, prove_partial_key_validity,
-            verify_partial_key_validity, verify_proof, RangeProofInput, BASE, EXPONENT, MODULUS,
-            RANGE,
+            generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
+        },
+        range_proof::{
+            generate_range_proof, verify_proof, RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };
@@ -102,11 +105,7 @@ mod tests {
             .map(|_| {
                 let (secret, partial) = generate_partial_key(&skde_params).unwrap();
                 let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
-                assert!(verify_partial_key_validity(
-                    &skde_params,
-                    partial.clone(),
-                    proof
-                ));
+                assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
                 partial
             })
             .collect();

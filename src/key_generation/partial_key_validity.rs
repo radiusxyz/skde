@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use big_integer::{big_mul_mod, big_pow_mod, generate_random_biguint};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -6,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 
 use super::{
-    errors::KeyGenerationError,
     generate_uv_pair,
     types::{PartialKey, SecretValue},
 };
@@ -30,10 +30,13 @@ pub struct PartialKeyProof {
 pub fn prove_partial_key_validity(
     skde_params: &SkdeParams,
     secret_value: &SecretValue,
-) -> Result<PartialKeyProof, KeyGenerationError> {
-    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
-    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
-    let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
+) -> Result<PartialKeyProof> {
+    let n = BigUint::from_str_radix(&skde_params.n, 10)
+        .context(format!("Failed to parse n parameter: {}", skde_params.n))?;
+    let g = BigUint::from_str_radix(&skde_params.g, 10)
+        .context(format!("Failed to parse g parameter: {}", skde_params.g))?;
+    let h = BigUint::from_str_radix(&skde_params.h, 10)
+        .context(format!("Failed to parse h parameter: {}", skde_params.h))?;
     let t = BigUint::from(skde_params.t);
 
     let r = &secret_value.r;
@@ -55,7 +58,8 @@ pub fn prove_partial_key_validity(
     let l = generate_random_biguint(&l_range);
     let x = generate_random_biguint(&x_range);
 
-    let ab_pair = generate_uv_pair(skde_params, &x, &l)?;
+    let ab_pair = generate_uv_pair(skde_params, &x, &l)
+        .context("Failed to generate AB pair for partial key proof")?;
 
     let a = ab_pair.u;
     let b = ab_pair.v;
@@ -83,10 +87,13 @@ pub fn verify_partial_key_validity(
     skde_params: &SkdeParams,
     partial_key: PartialKey,
     partial_key_proof: PartialKeyProof,
-) -> bool {
-    let n = BigUint::from_str_radix(&skde_params.n, 10).unwrap();
-    let g = BigUint::from_str_radix(&skde_params.g, 10).unwrap();
-    let h = BigUint::from_str_radix(&skde_params.h, 10).unwrap();
+) -> Result<bool> {
+    let n = BigUint::from_str_radix(&skde_params.n, 10)
+        .context(format!("Failed to parse n parameter: {}", skde_params.n))?;
+    let g = BigUint::from_str_radix(&skde_params.g, 10)
+        .context(format!("Failed to parse g parameter: {}", skde_params.g))?;
+    let h = BigUint::from_str_radix(&skde_params.h, 10)
+        .context(format!("Failed to parse h parameter: {}", skde_params.h))?;
     let n_square: BigUint = &n * &n;
 
     let t = BigUint::from(skde_params.t);
@@ -132,7 +139,13 @@ pub fn verify_partial_key_validity(
     );
 
     // Parallel verification of lhs and rhs vectors
-    lhs.par_iter().zip(rhs.par_iter()).all(|(l, r)| l == r)
+    let valid = lhs.par_iter().zip(rhs.par_iter()).all(|(l, r)| l == r);
+
+    if !valid {
+        Err(anyhow::anyhow!("Partial key verification failed"))
+    } else {
+        Ok(valid)
+    }
 }
 
 pub fn calculate_challenge(values: &[&BigUint]) -> BigUint {

@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use risc0_zkvm::{
     get_prover_server, ExecutorEnv, ExecutorImpl, ProveInfo, ProverOpts, Receipt, VerifierContext,
@@ -5,11 +6,9 @@ use risc0_zkvm::{
 use std::env;
 use std::time::Instant;
 
-use super::errors::KeyGenerationError;
-
 pub const RANGE_PROOF_ELF: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/src/key_generation/range_proof"
+    "/src/range_proof/range_proof"
 ));
 
 pub const RANGE_PROOF_ID: [u32; 8] = [
@@ -48,31 +47,28 @@ pub struct RangeProofOutput {
     pub u: BigUint,
 }
 
-pub(crate) fn setup_env<'a>(
-    input: &RangeProofInput,
-) -> Result<ExecutorEnv<'a>, KeyGenerationError> {
-    let serialized = bincode::serialize(input)?;
+pub(crate) fn setup_env<'a>(input: &RangeProofInput) -> Result<ExecutorEnv<'a>> {
+    let serialized = bincode::serialize(input).context("Failed to serialize range proof input")?;
+
     ExecutorEnv::builder()
         .write_slice(&serialized)
         .build()
-        .map_err(|_e| KeyGenerationError::ExecutorEnvError)
+        .context("Failed to build executor environment")
 }
 
-pub fn generate_range_proof(input: &RangeProofInput) -> Result<ProveInfo, KeyGenerationError> {
+pub fn generate_range_proof(input: &RangeProofInput) -> Result<ProveInfo> {
     let env = setup_env(input)?;
 
     let mut exec = ExecutorImpl::from_elf(env, RANGE_PROOF_ELF)
-        .map_err(|e| KeyGenerationError::ExecutorCreationError(e.to_string()))?;
+        .context("Failed to create executor from ELF")?;
 
     let exec_start = Instant::now();
-    let session = exec
-        .run()
-        .map_err(|e| KeyGenerationError::SessionExecutionError(e.to_string()))?;
+    let session = exec.run().context("Failed to execute RISC Zero session")?;
     let exec_duration = exec_start.elapsed();
     println!("Session execution completed in {:?}", exec_duration);
 
-    let prover = get_prover_server(&ProverOpts::succinct())
-        .map_err(|e| KeyGenerationError::ProverServerError(e.to_string()))?;
+    let prover =
+        get_prover_server(&ProverOpts::succinct()).context("Failed to get prover server")?;
 
     let ctx = VerifierContext::default();
 
@@ -80,27 +76,34 @@ pub fn generate_range_proof(input: &RangeProofInput) -> Result<ProveInfo, KeyGen
     let proof_start = Instant::now();
     let prove_info = prover
         .prove_session(&ctx, &session)
-        .map_err(|e| KeyGenerationError::ProofGenerationError(e.to_string()))?;
+        .context("Failed to generate proof")?;
     let proof_duration = proof_start.elapsed();
     println!("Proof generation completed in {:?}", proof_duration);
 
     Ok(prove_info)
 }
 
-pub fn verify_proof(partial_key_u: BigUint, receipt: &Receipt) -> Result<(), KeyGenerationError> {
-    let output: RangeProofOutput = receipt.journal.decode()?;
+pub fn verify_proof(partial_key_u: BigUint, receipt: &Receipt) -> Result<()> {
+    let output: RangeProofOutput = receipt
+        .journal
+        .decode()
+        .context("Failed to decode range proof output")?;
     println!("u: {}, range: {}", output.u, output.range);
 
     println!("Starting verification...");
     let verify_start = Instant::now();
     receipt
         .verify(RANGE_PROOF_ID)
-        .map_err(|_| KeyGenerationError::ReceiptVerificationError)?;
+        .context("Failed to verify receipt")?;
     let verify_duration = verify_start.elapsed();
     println!("Verification completed in {:?}", verify_duration);
 
     if partial_key_u != output.u {
-        return Err(KeyGenerationError::PartialKeyMismatch);
+        return Err(anyhow::anyhow!(
+            "Partial key mismatch: expected {}, found {}",
+            partial_key_u,
+            output.u
+        ));
     }
 
     println!("Verified");
