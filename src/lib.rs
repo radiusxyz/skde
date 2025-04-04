@@ -4,7 +4,6 @@ pub use num_bigint::BigUint;
 pub use num_prime::RandPrime;
 
 pub mod delay_encryption;
-pub mod errors;
 pub mod key_aggregation;
 pub mod key_generation;
 pub mod range_proof;
