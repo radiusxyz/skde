@@ -32,7 +32,8 @@ mod tests {
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
         },
         range_proof::{
-            generate_range_proof, verify_proof, RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
+            generate_range_proof, verify_proof, verify_proofs, verify_proofs_parallel,
+            RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };
@@ -142,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_and_verify_range_proof() {
+    fn test_range_proof_single_generate_and_verify() {
         // Test small bits
         let exponent = BigUint::from_str(EXPONENT).expect("Invalid number for Exponent");
 
@@ -160,6 +161,57 @@ mod tests {
         let proof = generate_range_proof(&input).unwrap();
         let u = input.base.modpow(&exponent, &input.modulus);
         verify_proof(u, &proof.receipt).unwrap();
+    }
+
+    #[test]
+    fn test_reange_proof_parallel_vs_sequential() {
+        let exponent = BigUint::from_str(EXPONENT).expect("Invalid number for Exponent");
+
+        // Creating 10 proofs with small bit size input
+        let input = RangeProofInput {
+            base: BigUint::from_str("4").unwrap(),
+            modulus: BigUint::from_str("6").unwrap(),
+            range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
+        };
+
+        println!("Number of proofs to generate: 10");
+        println!("Generating proofs...");
+
+        // Create 10 identical proofs
+        let mut receipts = Vec::with_capacity(10);
+        let mut u_vec = Vec::with_capacity(10);
+        let proof = generate_range_proof(&input).unwrap();
+        let u = input.base.modpow(&exponent, &input.modulus);
+
+        for _i in 0..10 {
+            receipts.push(proof.receipt.clone());
+            u_vec.push(u.clone());
+        }
+
+        // Measure sequential verification time
+        println!("\n=== Sequential Verification Start ===");
+        let sequential_start = Instant::now();
+        verify_proofs(u_vec.clone(), &receipts).unwrap();
+        let sequential_duration = sequential_start.elapsed();
+
+        // Measure parallel verification time
+        println!("\n=== Parallel Verification Start ===");
+        let parallel_start = Instant::now();
+        verify_proofs_parallel(u_vec.clone(), &receipts).unwrap();
+        let parallel_duration = parallel_start.elapsed();
+
+        // Print comparison results
+        println!("\n=== Performance Comparison Results ===");
+        println!("Sequential verification time: {:?}", sequential_duration);
+        println!("Parallel verification time: {:?}", parallel_duration);
+
+        if parallel_duration < sequential_duration {
+            let speedup = sequential_duration.as_secs_f64() / parallel_duration.as_secs_f64();
+            println!("Parallel processing is {:.2}x faster", speedup);
+        } else {
+            let slowdown = parallel_duration.as_secs_f64() / sequential_duration.as_secs_f64();
+            println!("Sequential processing is {:.2}x faster", slowdown);
+        }
     }
 
     /// Tests the correctness of the `setup` function and generated parameters.
@@ -190,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_standard_vs_hybrid_various_lengths() {
+    fn test_encryption_benchmark_standard_vs_hybrid() {
         let mut results = Vec::new();
 
         for &len in &[64, 128, 256, 512, 1024, 2048] {
