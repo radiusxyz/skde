@@ -6,6 +6,7 @@ pub use num_prime::RandPrime;
 pub mod delay_encryption;
 pub mod key_aggregation;
 pub mod key_generation;
+pub mod range_proof;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;
 pub const BIT_LEN: usize = 2048; // n's bit length
@@ -22,7 +23,6 @@ mod tests {
 
     use big_integer::mod_exp_by_pow_of_two;
     use num_bigint::BigUint;
-    use num_integer::Integer;
     use rand::{distributions::Alphanumeric, Rng};
 
     use crate::{
@@ -33,11 +33,15 @@ mod tests {
         key_generation::{
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
         },
+        range_proof::{
+            generate_range_proof, verify_proof, verify_proofs, verify_proofs_parallel,
+            RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
+        },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };
 
     // Predefined RSA modulus for deterministic encryption test
-    pub const MOD_N: &str = "12317006071311007300714876688669951960323170067131100730071487668866995196044410266971548403213034542752465519174588678920822413751218732433556464077681226971648584122232539991050424720543986756055030558294569419425530972641905163360110155142076990346574196602661033710557883561451313659805201401507725732760680369706273998708362104989450281274934441026697154840321303454275246551917458867892082241375121873243355646407768122697164858412223253999105042472054398675605503055829456941942553097264190516336011015514207699034657419660266103371055788356145131365980520140150772573276068036970627399870836210498945028127480";
+    pub const MOD_N: &str = "26737688233630987849749538623559587294088037102809480632570023773459222152686633609232230584184543857897813615355225270819491245893096628373370101798393754657209853664433779631579690734503677773804892912774381357280025811519740953667880409246987453978226997595139808445552217486225687511164958368488319372068289768937729234964502681229612929764203977349037219047813560623373035187038018937232123821089208711930458219009895581132844064176371047461419609098259825422421077554570457718558971463292559934623518074946858187287041522976374186587813034651849410990884606427758413847140243755163116582922090226726575253150079";
 
     struct BenchmarkResult {
         message_len: usize,
@@ -64,6 +68,14 @@ mod tests {
             h: h.to_str_radix(10),
             max_sequencer_number: max_seq.to_str_radix(10),
         }
+    }
+
+    fn setup_default_input() -> RangeProofInput {
+        RangeProofInput::new(
+            BigUint::from_str(BASE).expect("Invalid number for Base"),
+            BigUint::from_str(MODULUS).expect("Invalid number for Modulus"),
+            BigUint::from_str(RANGE).expect("Invalid number for Range"),
+        )
     }
 
     /// Generates a random ASCII string of the specified byte length.
@@ -93,13 +105,9 @@ mod tests {
         // Generate partial keys & Verify all
         let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
             .map(|_| {
-                let (secret, partial) = generate_partial_key(&skde_params);
-                let proof = prove_partial_key_validity(&skde_params, &secret);
-                assert!(verify_partial_key_validity(
-                    &skde_params,
-                    partial.clone(),
-                    proof
-                ));
+                let (secret, partial) = generate_partial_key(&skde_params).unwrap();
+                let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
+                assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
                 partial
             })
             .collect();
@@ -136,6 +144,78 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_range_proof_single_generate_and_verify() {
+        // Test small bits
+        let exponent = BigUint::from_str(EXPONENT).expect("Invalid number for Exponent");
+
+        let input = RangeProofInput {
+            base: BigUint::from_str("4").unwrap(),
+            modulus: BigUint::from_str("6").unwrap(),
+            range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
+        };
+        let proof = generate_range_proof(&input).unwrap();
+        let u = input.base.modpow(&exponent, &input.modulus);
+        verify_proof(u, &proof.receipt).unwrap();
+
+        // Test 2048-bits
+        let input = setup_default_input();
+        let proof = generate_range_proof(&input).unwrap();
+        let u = input.base.modpow(&exponent, &input.modulus);
+        verify_proof(u, &proof.receipt).unwrap();
+    }
+
+    #[test]
+    fn test_reange_proof_parallel_vs_sequential() {
+        let exponent = BigUint::from_str(EXPONENT).expect("Invalid number for Exponent");
+
+        // Creating 10 proofs with small bit size input
+        let input = RangeProofInput {
+            base: BigUint::from_str("4").unwrap(),
+            modulus: BigUint::from_str("6").unwrap(),
+            range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
+        };
+
+        println!("Number of proofs to generate: 10");
+        println!("Generating proofs...");
+
+        // Create 10 identical proofs
+        let mut receipts = Vec::with_capacity(10);
+        let mut u_vec = Vec::with_capacity(10);
+        let proof = generate_range_proof(&input).unwrap();
+        let u = input.base.modpow(&exponent, &input.modulus);
+
+        for _i in 0..10 {
+            receipts.push(proof.receipt.clone());
+            u_vec.push(u.clone());
+        }
+
+        // Measure sequential verification time
+        println!("\n=== Sequential Verification Start ===");
+        let sequential_start = Instant::now();
+        verify_proofs(u_vec.clone(), &receipts).unwrap();
+        let sequential_duration = sequential_start.elapsed();
+
+        // Measure parallel verification time
+        println!("\n=== Parallel Verification Start ===");
+        let parallel_start = Instant::now();
+        verify_proofs_parallel(u_vec.clone(), &receipts).unwrap();
+        let parallel_duration = parallel_start.elapsed();
+
+        // Print comparison results
+        println!("\n=== Performance Comparison Results ===");
+        println!("Sequential verification time: {:?}", sequential_duration);
+        println!("Parallel verification time: {:?}", parallel_duration);
+
+        if parallel_duration < sequential_duration {
+            let speedup = sequential_duration.as_secs_f64() / parallel_duration.as_secs_f64();
+            println!("Parallel processing is {:.2}x faster", speedup);
+        } else {
+            let slowdown = parallel_duration.as_secs_f64() / sequential_duration.as_secs_f64();
+            println!("Sequential processing is {:.2}x faster", slowdown);
+        }
+    }
+
     /// Tests the correctness of the `setup` function and generated parameters.
     /// Ensures all fields are consistent and `n` is sufficiently large.
     #[test]
@@ -161,11 +241,10 @@ mod tests {
         println!("{:?}", n.bits());
         assert!(n.bits() >= (BIT_LEN - 1) as u64, "Modulus too small");
         // assert!(n.is_odd(), "Modulus n should be odd");
-
     }
 
     #[test]
-    fn benchmark_standard_vs_hybrid_various_lengths() {
+    fn test_encryption_benchmark_standard_vs_hybrid() {
         let mut results = Vec::new();
 
         for &len in &[64, 128, 256, 512, 1024, 2048] {
