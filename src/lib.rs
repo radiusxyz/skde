@@ -26,7 +26,9 @@ mod tests {
     use rand::{distributions::Alphanumeric, Rng};
 
     use crate::{
-        delay_encryption::{decrypt, encrypt, setup, solve_time_lock_puzzle, SkdeParams},
+        delay_encryption::{
+            decrypt, encrypt, setup, solve_time_lock_puzzle, validate_secret_key, SkdeParams,
+        },
         key_aggregation::aggregate_key,
         key_generation::{
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
@@ -251,7 +253,7 @@ mod tests {
             results.push((standard, hybrid));
         }
         // Print performance table with ciphertext sizes
-        println!("{:<8} | {:^43} | {:^43}", "Bytes", "Standard", "Hybrid");
+        println!("{:<8} | {:^41} || {:^41}", "Bytes", "Standard", "Hybrid");
         println!("{}", "-".repeat(100));
         println!(
             "{:<8} | {:>8} | {:>8} | {:>8} | {:>8} || {:>8} | {:>8} | {:>8} | {:>8}",
@@ -275,5 +277,36 @@ mod tests {
             hyb.ciphertext_size
         );
         }
+    }
+
+    #[test]
+    fn test_secret_key_validation() {
+        // 1. Set up SKDE parameters
+        let skde_params = default_skde_params();
+
+        // 2. Generate partial keys and verify
+        let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
+            .map(|_| {
+                let (secret, partial) = generate_partial_key(&skde_params);
+                let proof = prove_partial_key_validity(&skde_params, &secret);
+                assert!(verify_partial_key_validity(
+                    &skde_params,
+                    partial.clone(),
+                    proof
+                ));
+                partial
+            })
+            .collect();
+
+        // 3. Aggregate public keys and solve puzzle
+        let aggregated_key = aggregate_key(&skde_params, &partial_keys);
+        let encryption_key = aggregated_key.u.clone();
+        let secret_key =
+            solve_time_lock_puzzle(&skde_params, &aggregated_key).expect("Puzzle solving failed");
+
+        // 4. Validate the secret key
+        let is_valid = validate_secret_key(&skde_params, &encryption_key, &secret_key.sk, true);
+
+        assert!(is_valid, "Secret key validation failed");
     }
 }

@@ -27,6 +27,25 @@ pub struct PartialKeyProof {
     pub beta: BigUint,
 }
 
+/// Generates a proof that a given `PartialKey` was correctly constructed
+/// from a valid secret (r, s, k) without revealing it.
+///
+/// # Inputs
+/// - `skde_params`: SKDE public parameters
+/// - `secret_value`: Secret scalars (r, s, k) used to construct the partial key
+///
+/// # Returns
+/// - `PartialKeyProof`: A proof that the corresponding (u, v, y, w) values are
+///   valid
+///
+/// # Protocol Summary
+/// Constructs (a, b, tau) as commitments to random values (x, l),
+/// then computes challenge `e = H(transcript)`, and response values
+/// - alpha = (r + s + k) * e + x
+/// - beta  = (r + s) * e + l
+///
+/// These responses are then used in `verify_partial_key_validity`
+/// to prove knowledge of (r, s, k) consistent with the public key.
 pub fn prove_partial_key_validity(
     skde_params: &SkdeParams,
     secret_value: &SecretValue,
@@ -83,6 +102,23 @@ pub fn prove_partial_key_validity(
     })
 }
 
+/// Verifies a proof of correctness for a `PartialKey`
+///
+/// # Inputs
+/// - `skde_params`: SKDE public parameters
+/// - `partial_key`: (u, v, y, w) public values
+/// - `partial_key_proof`: Proof struct containing (a, b, tau, alpha, beta)
+///
+/// # Returns
+/// - `true` if the proof is valid
+/// - `false` if the proof is invalid
+///
+/// # Verification Equations
+/// - g^alpha = (u * y)^e * a mod n
+/// - h^{n * alpha} * (n+1)^beta = (v * w)^e * b mod n^2
+/// - g^beta = u^e * tau mod n
+///
+/// These equations are evaluated in parallel and compared.
 pub fn verify_partial_key_validity(
     skde_params: &SkdeParams,
     partial_key: PartialKey,
@@ -148,6 +184,19 @@ pub fn verify_partial_key_validity(
     }
 }
 
+/// Computes a Fiat-Shamir challenge `e` using SHA-512 over a vector of BigUints
+///
+/// # Inputs
+/// - `values`: A slice of BigUint references representing the protocol
+///   transcript
+///
+/// # Returns
+/// - A `BigUint` challenge value derived from the transcript
+///
+/// # Notes
+/// - This function implements Fiat-Shamir transformation for non-interactive
+///   proofs
+/// - The resulting hash is interpreted as a BigUint in big-endian form
 pub fn calculate_challenge(values: &[&BigUint]) -> BigUint {
     let mut sha = Sha512::new();
 

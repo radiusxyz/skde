@@ -7,34 +7,39 @@ Delay encryption is a cryptographic tool that employs time-lock puzzles to enfor
 
 As its core, delay encryption involves two main phases: encryption and timed decryption. During the encryption phase, data is encrypted using a standard cryptographic algorithm, and a time-lock puzzle is generated. This puzzle is constructed in such a way that solving it requires a predictable amount of computational effort, effectively creating a “delay” before the information can be accessed.
 
-## Key Aggregation Circuit
-We introduce a novel idea for the aggregation process within the SKDE framework. Instead of naively storing all partial keys, only the committed values are revealed. To ensure that the aggregation has been performed correctly, we incorporate a circuit to prove this with zero-knowledge proofs (ZKP). This new aggregation process significantly reduces the gas fees associated with public key storage in MDE, enhancing overall system efficiency while maintaining the integrity of the aggregation process.
-
-For more information, refer to the following link: [Radius SKDE on EthResearch](https://ethresear.ch/t/radius-skde-enhancing-rollup-composability-with-trustless-sequencing/19185)
-
-
-# Example
-
-The Radius SKDE provides a suite of tests and benchmarks to validate and assess the performance of its cryptographic features, especially for delay encryption and key aggregation.
-
+To improve efficiency for large messages, the SKDE protocol supports an optional hybrid encryption mode. In this mode, the message is encrypted using AES-GCM (a symmetric cipher), and only the AES key and IV are encrypted using the delay encryption mechanism. This approach significantly reduces ciphertext size and encryption time while preserving the delayed-decryption guarantee.
 
 ## Running Tests
 
-To test the `delay_encryption` feature, use the following command:
+Radius SKDE includes several tests to verify the correctness and measure the performance of the delay encryption protocol.
+
+### 1. Test delay encryption benchmark and function correctness
 
 ```bash
-cargo test test_single_key_delay_encryption
+cargo test benchmark_standard_vs_hybrid_various_lengths -- --nocapture
 ```
 
-This test performs the following steps:
+This test compares Standard vs Hybrid encryption across various message sizes.
 
-1. **Setup Parameters**: Generates two large prime numbers $p$ and $q$ to create an RSA modulus $n = p * q$. Set all the parameters including a generator $g$ that will be used for base of exponentiation operation and the delay time parameter and maximun number of sequencer to set.
+For each input size (64, 128, 256, 512, 1024, 2048 bytes), it performs the following steps:
+
+1. **Setup Parameters**: Generates two large prime numbers $p$ and $q$ to create an RSA modulus $n = p * q$. Sets all the parameters including a generator $g$ that will be used for base of exponentiation operation and the delay time parameter and maximun number of sequencers to set.
 2. **Generate Partial Keys and Proofs**: Creates partial keys and validity proofs for each sequencer. **(TODO)** In a complete implementation, range proofs would be used to ensure that the aggregated keys represent a unique combination of partial keys.
 3. **Verify All Generated Partial Keys**: Confirms the validity of all generated keys.
 4. **Aggregate Partial Keys**: Combines partial keys into a single aggregated key.
 5. **Encrypt a Message**: Encrypts a test message using the aggregated key.
 6. **Solve Time-lock Puzzle**: Solves a time-lock puzzle to retrieve the secret key.
 7. **Decrypt the Cipher Text**: Decrypts the encrypted message and checks it matches the original.
+
+It measures:
+
+- Encryption time
+
+- Puzzle-solving time
+
+- Decryption time
+
+- Ciphertext size
 
 
 Note that, in a standard implementation, large prime numbers $p$ and $q$ would be securely generated to calculate the RSA modulus $N = p \times q$. Once $N$ is calculated, the values of $p$ and $q$ are discarded to ensure cryptographic security. However, for testing purposes, we initialize these parameters using fixed primes.
@@ -43,20 +48,17 @@ Step 2 must include a range proof to ensure that the aggregated keys uniquely re
 
 This test ensures the delay encryption feature is functioning correctly and verifies key generation, encryption, decryption, and time-lock puzzle-solving processes.
 
-## Running Benchmarks
-
-Benchmark tests in this SDK are designed to evaluate performance of zkCircuit proving for aggregation.
-
-To run a specific benchmark test, use the `cargo bench` command followed by the `--bench` option with the benchmark file name. This command allows you to run targeted benchmark tests.
-
-### Running the `aggregate_with_hash` Benchmark
-
+### 2. Test secure setup
 ```bash
-cargo bench --bench aggregate_with_hash
+cargo test test_secure_setup
 ```
+This test ensures that setup() correctly generates valid SKDE parameters.
 
-This command benchmarks the performance of the `aggregate_with_hash` function, which combines partial keys from multiple sequencers.
-
+### 3. Test decryption key validity
+```bash
+cargo test test_secret_key_validation
+```
+This test guarantees that the derived secret key is functionally valid for use in delay encryption.
 
 ## Additional Configuration
 
@@ -64,7 +66,6 @@ This SKDE includes parameters for cryptographic configurations, such as bit leng
 
 - **MAX_SEQUENCER_NUMBER**: $2$ (default for this project)
 - **BIT_LEN**: $2048$ (bit length of $n$)
-- **PRIME_P, PRIME_Q**: Large prime numbers for key generation
 - **GENERATOR**: A constant value used in cryptographic functions
 - **TIME_PARAM_T**: $2$ (defines delay time as $2$`^TIME_PARAM_T`)
 
