@@ -9,12 +9,12 @@ use std::time::Instant;
 /// ELF binary for range proof execution
 pub const RANGE_PROOF_ELF: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/src/range_proof/range_proof"
+    "/src/range_proof/range_proof.bin"
 ));
 
 /// Unique ID used for range proof ELF
 pub const RANGE_PROOF_ID: [u32; 8] = [
-    2853987573, 2306891643, 1372111899, 3734673277, 3052955973, 1620853738, 1113992147, 2156397505,
+    3975637365, 3132349927, 1261025718, 3120425263, 88843406, 3451875883, 263096980, 3681459231,
 ];
 
 /// Default modulus value (1024bits)
@@ -23,7 +23,7 @@ pub const MODULUS: &str = "10910878416667652968234057792949818895023958552788368
 pub const BASE: &str = "4";
 /// Ragne for range proof
 pub const RANGE: &str =
-    "54228695914669666723440166889041962662973721213812451561550491637090461709551";
+    "32317006071311007300714876688669951960444102669715484032130345427524655138867890893197201411522913463688717960921898019494119559150490921095088152386448283120630877367300996091750197750389652106796057638384067568276792218642619756161838094338476170470581645852036305042887575891541065808607552399123930385521914333389668342420684974786564569494856176035326322058077805659331026192708460314150258592864177116725943603718461857357598351152301645904403697613233287231227125684710820209725157101726931323469678542580656697935045997268352998638215525166389437335543602135433229604645318478604952148193555853611059596230656";
 /// Exponent value
 pub const EXPONENT: &str = "462000193083985684610660351369692616274581519034636217798321";
 
@@ -32,15 +32,17 @@ pub const EXPONENT: &str = "4620001930839856846106603513696926162745815190346362
 pub struct RangeProofInput {
     pub base: BigUint,
     pub modulus: BigUint,
+    pub exponent: BigUint,
     pub range: BigUint,
 }
 
 impl RangeProofInput {
     /// Create a new RangeProofInput with custom inputs
-    pub fn new(base: BigUint, modulus: BigUint, range: BigUint) -> Self {
+    pub fn new(base: BigUint, modulus: BigUint, exponent: BigUint, range: BigUint) -> Self {
         RangeProofInput {
             base,
             modulus,
+            exponent,
             range,
         }
     }
@@ -103,7 +105,7 @@ pub fn generate_range_proof(input: &RangeProofInput) -> Result<ProveInfo> {
 /// Verify a single proof
 ///
 /// Compares expected partial key with proof and verifies
-pub fn verify_proof(partial_key_u: BigUint, receipt: &Receipt) -> Result<()> {
+pub fn verify_range_proof(partial_key_u: BigUint, receipt: &Receipt) -> Result<()> {
     // Decode result data from proof
     let output: RangeProofOutput = receipt
         .journal

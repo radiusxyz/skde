@@ -4,6 +4,7 @@ mod tests {
 
     use big_integer::mod_exp_by_pow_of_two;
     use num_bigint::BigUint;
+    use num_traits::One;
     use rand::{distributions::Alphanumeric, Rng};
 
     use crate::{
@@ -15,7 +16,7 @@ mod tests {
             generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
         },
         range_proof::{
-            generate_range_proof, verify_proof, verify_proofs, verify_proofs_parallel,
+            generate_range_proof, verify_proofs, verify_proofs_parallel, verify_range_proof,
             RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
@@ -55,6 +56,7 @@ mod tests {
         RangeProofInput::new(
             BigUint::from_str(BASE).expect("Invalid number for Base"),
             BigUint::from_str(MODULUS).expect("Invalid number for Modulus"),
+            BigUint::from_str(EXPONENT).expect("Invalid number for Exponent"),
             BigUint::from_str(RANGE).expect("Invalid number for Range"),
         )
     }
@@ -89,6 +91,16 @@ mod tests {
                 let (secret, partial) = generate_partial_key(&skde_params).unwrap();
                 let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
                 assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
+
+                let range_proof = generate_range_proof(&RangeProofInput::new(
+                    BigUint::from_str(&skde_params.g).unwrap(),
+                    BigUint::from_str(&skde_params.n).unwrap(),
+                    secret.r + secret.s,
+                    BigUint::from_str(RANGE).unwrap(),
+                ))
+                .unwrap();
+                verify_range_proof(partial.u.clone(), &range_proof.receipt).unwrap();
+
                 partial
             })
             .collect();
@@ -133,17 +145,18 @@ mod tests {
         let input = RangeProofInput {
             base: BigUint::from_str("4").unwrap(),
             modulus: BigUint::from_str("6").unwrap(),
+            exponent: BigUint::from_str("5").unwrap(),
             range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
         };
         let proof = generate_range_proof(&input).unwrap();
         let u = input.base.modpow(&exponent, &input.modulus);
-        verify_proof(u, &proof.receipt).unwrap();
+        verify_range_proof(u, &proof.receipt).unwrap();
 
         // Test 2048-bits
         let input = setup_default_input();
         let proof = generate_range_proof(&input).unwrap();
         let u = input.base.modpow(&exponent, &input.modulus);
-        verify_proof(u, &proof.receipt).unwrap();
+        verify_range_proof(u, &proof.receipt).unwrap();
     }
 
     #[test]
@@ -154,6 +167,7 @@ mod tests {
         let input = RangeProofInput {
             base: BigUint::from_str("4").unwrap(),
             modulus: BigUint::from_str("6").unwrap(),
+            exponent: exponent.clone(),
             range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
         };
 
@@ -226,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_encryption_benchmark_standard_vs_hybrid() {
-        let mut results = Vec::new();
+        let mut results: Vec<(BenchmarkResult, BenchmarkResult)> = Vec::new();
 
         for &len in &[64, 128, 256, 512, 1024, 2048] {
             let standard = run_encryption_benchmark(false, len);
