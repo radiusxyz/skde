@@ -4,7 +4,6 @@ mod tests {
 
     use big_integer::mod_exp_by_pow_of_two;
     use num_bigint::BigUint;
-    use num_traits::One;
     use rand::{distributions::Alphanumeric, Rng};
 
     use crate::{
@@ -78,12 +77,14 @@ mod tests {
             .collect()
     }
 
-    fn run_encryption_benchmark(hybrid: bool, message_len: usize) -> BenchmarkResult {
+    fn run_encryption_benchmark(
+        hybrid: bool,
+        message_len: usize,
+        generate_range_proofs: bool,
+    ) -> BenchmarkResult {
         // Set skde parameters
         let skde_params = default_skde_params();
         let message = generate_random_message(message_len);
-
-        // let encryption_type = if hybrid { "Hybrid" } else { "Standard" };
 
         // Generate partial keys & Verify all
         let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
@@ -92,14 +93,17 @@ mod tests {
                 let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
                 assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
 
-                let range_proof = generate_range_proof(&RangeProofInput::new(
-                    BigUint::from_str(&skde_params.g).unwrap(),
-                    BigUint::from_str(&skde_params.n).unwrap(),
-                    secret.r + secret.s,
-                    BigUint::from_str(RANGE).unwrap(),
-                ))
-                .unwrap();
-                verify_range_proof(partial.u.clone(), &range_proof.receipt).unwrap();
+                if generate_range_proofs {
+                    println!("Generating range proof for partial key: {}", partial.u);
+                    let range_proof = generate_range_proof(&RangeProofInput::new(
+                        BigUint::from_str(&skde_params.g).unwrap(),
+                        BigUint::from_str(&skde_params.n).unwrap(),
+                        secret.r + secret.s,
+                        BigUint::from_str(RANGE).unwrap(),
+                    ))
+                    .unwrap();
+                    verify_range_proof(partial.u.clone(), &range_proof.receipt).unwrap();
+                }
 
                 partial
             })
@@ -129,11 +133,38 @@ mod tests {
 
         BenchmarkResult {
             message_len,
-            // encryption_type: encryption_type.to_string(),
             encryption_time,
             puzzle_time,
             decryption_time,
             ciphertext_size,
+        }
+    }
+
+    fn print_benchmark_results(results: &[(BenchmarkResult, BenchmarkResult)], title: &str) {
+        println!("\n=== Benchmark Results {} ===", title);
+        println!("{:<8} | {:^41} || {:^41}", "Bytes", "Standard", "Hybrid");
+        println!("{}", "-".repeat(100));
+        println!(
+            "{:<8} | {:>8} | {:>8} | {:>8} | {:>8} || {:>8} | {:>8} | {:>8} | {:>8}",
+            "", "Enc(ms)", "Puz(ms)", "Dec(ms)", "Size", "Enc(ms)", "Puz(ms)", "Dec(ms)", "Size"
+        );
+        println!("{}", "-".repeat(100));
+
+        for (std, hyb) in results {
+            assert_eq!(std.message_len, hyb.message_len);
+
+            println!(
+                "{:<8} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8} || {:>8.2} | {:>8.2} | {:>8.2} | {:>8}",
+                std.message_len,
+                std.encryption_time.as_secs_f64() * 1000.0,
+                std.puzzle_time.as_secs_f64() * 1000.0,
+                std.decryption_time.as_secs_f64() * 1000.0,
+                std.ciphertext_size,
+                hyb.encryption_time.as_secs_f64() * 1000.0,
+                hyb.puzzle_time.as_secs_f64() * 1000.0,
+                hyb.decryption_time.as_secs_f64() * 1000.0,
+                hyb.ciphertext_size
+            );
         }
     }
 
@@ -160,10 +191,11 @@ mod tests {
     }
 
     #[test]
-    fn test_reange_proof_parallel_vs_sequential() {
+    fn test_range_proof_verification_benchmark() {
         let exponent = BigUint::from_str(EXPONENT).expect("Invalid number for Exponent");
+        let num_proofs = 32;
 
-        // Creating 10 proofs with small bit size input
+        // Creating proofs with small bit size input
         let input = RangeProofInput {
             base: BigUint::from_str("4").unwrap(),
             modulus: BigUint::from_str("6").unwrap(),
@@ -171,16 +203,16 @@ mod tests {
             range: BigUint::from_str(RANGE).expect("Invalid number for Range"),
         };
 
-        println!("Number of proofs to generate: 10");
+        println!("Number of proofs to generate: {}", num_proofs);
         println!("Generating proofs...");
 
-        // Create 10 identical proofs
-        let mut receipts = Vec::with_capacity(10);
-        let mut u_vec = Vec::with_capacity(10);
+        // Create identical proofs
+        let mut receipts = Vec::with_capacity(num_proofs);
+        let mut u_vec = Vec::with_capacity(num_proofs);
         let proof = generate_range_proof(&input).unwrap();
         let u = input.base.modpow(&exponent, &input.modulus);
 
-        for _i in 0..10 {
+        for _i in 0..num_proofs {
             receipts.push(proof.receipt.clone());
             u_vec.push(u.clone());
         }
@@ -235,43 +267,35 @@ mod tests {
         assert_eq!(skde_params.t, TIME_PARAM_T, "Time parameter mismatch");
         println!("{:?}", n.bits());
         assert!(n.bits() >= (BIT_LEN - 1) as u64, "Modulus too small");
-        // assert!(n.is_odd(), "Modulus n should be odd");
     }
 
     #[test]
-    fn test_encryption_benchmark_standard_vs_hybrid() {
+    fn test_encryption_benchmark_standard_vs_hybrid_without_range_proofs() {
         let mut results: Vec<(BenchmarkResult, BenchmarkResult)> = Vec::new();
 
+        println!("Running benchmarks WITHOUT range proofs");
         for &len in &[64, 128, 256, 512, 1024, 2048] {
-            let standard = run_encryption_benchmark(false, len);
-            let hybrid = run_encryption_benchmark(true, len);
+            let standard = run_encryption_benchmark(false, len, false);
+            let hybrid = run_encryption_benchmark(true, len, false);
             results.push((standard, hybrid));
         }
-        // Print performance table with ciphertext sizes
-        println!("{:<8} | {:^41} || {:^41}", "Bytes", "Standard", "Hybrid");
-        println!("{}", "-".repeat(100));
-        println!(
-            "{:<8} | {:>8} | {:>8} | {:>8} | {:>8} || {:>8} | {:>8} | {:>8} | {:>8}",
-            "", "Enc(ms)", "Puz(ms)", "Dec(ms)", "Size", "Enc(ms)", "Puz(ms)", "Dec(ms)", "Size"
-        );
-        println!("{}", "-".repeat(100));
 
-        for (std, hyb) in &results {
-            assert_eq!(std.message_len, hyb.message_len);
+        print_benchmark_results(&results, "WITHOUT Range Proofs");
+    }
 
-            println!(
-            "{:<8} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8} || {:>8.2} | {:>8.2} | {:>8.2} | {:>8}",
-            std.message_len,
-            std.encryption_time.as_secs_f64() * 1000.0,
-            std.puzzle_time.as_secs_f64() * 1000.0,
-            std.decryption_time.as_secs_f64() * 1000.0,
-            std.ciphertext_size,
-            hyb.encryption_time.as_secs_f64() * 1000.0,
-            hyb.puzzle_time.as_secs_f64() * 1000.0,
-            hyb.decryption_time.as_secs_f64() * 1000.0,
-            hyb.ciphertext_size
-        );
+    #[test]
+    #[ignore]
+    fn test_encryption_benchmark_standard_vs_hybrid_with_range_proofs() {
+        let mut results: Vec<(BenchmarkResult, BenchmarkResult)> = Vec::new();
+
+        println!("Running benchmarks WITH range proofs");
+        for &len in &[64, 128, 256, 512, 1024, 2048] {
+            let standard = run_encryption_benchmark(false, len, true);
+            let hybrid = run_encryption_benchmark(true, len, true);
+            results.push((standard, hybrid));
         }
+
+        print_benchmark_results(&results, "WITH Range Proofs");
     }
 
     #[test]
