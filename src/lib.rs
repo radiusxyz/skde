@@ -6,7 +6,7 @@ pub use num_prime::RandPrime;
 pub mod delay_encryption;
 pub mod key_aggregation;
 pub mod key_generation;
-pub mod range_proof;
+
 mod tests;
 
 pub const MAX_SEQUENCER_NUMBER: usize = 2;

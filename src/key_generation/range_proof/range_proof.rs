@@ -9,7 +9,7 @@ use std::time::Instant;
 /// ELF binary for range proof execution
 pub const RANGE_PROOF_ELF: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/src/range_proof/range_proof.bin"
+    "/src/key_generation/range_proof/range_proof.bin"
 ));
 
 /// Unique ID used for range proof ELF

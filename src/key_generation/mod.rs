@@ -1,4 +1,5 @@
 mod partial_key_validity;
+pub mod range_proof;
 mod types;
 
 use crate::SkdeParams;
