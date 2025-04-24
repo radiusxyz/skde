@@ -11,12 +11,13 @@ mod tests {
             decrypt, encrypt, setup, solve_time_lock_puzzle, validate_secret_key, SkdeParams,
         },
         key_aggregation::aggregate_key,
-        key_generation::range_proof::{
-            generate_range_proof, verify_proofs, verify_proofs_parallel, verify_range_proof,
-            RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
-        },
         key_generation::{
-            generate_partial_key, prove_partial_key_validity, verify_partial_key_validity,
+            generate_partial_key, prove_partial_key_validity,
+            range_proof::{
+                generate_range_proof, verify_proofs, verify_proofs_parallel, verify_range_proof,
+                RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
+            },
+            verify_partial_key_validity,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
     };

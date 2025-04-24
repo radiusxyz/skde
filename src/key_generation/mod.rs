@@ -1,8 +1,8 @@
 mod partial_key_validity;
 pub mod range_proof;
+pub mod sigma_proof;
 mod types;
 
-use crate::SkdeParams;
 use anyhow::{Context, Result};
 use big_integer::{big_pow_mod, generate_random_biguint, BigIntChip, BigIntInstructions};
 use ff::PrimeField;
@@ -11,8 +11,9 @@ use maingate::RegionCtx;
 use num_bigint::BigUint;
 use num_traits::{Num, One};
 pub use partial_key_validity::*;
-
 pub use types::*;
+
+use crate::SkdeParams;
 
 pub fn generate_partial_key(skde_params: &SkdeParams) -> Result<(SecretValue, PartialKey)> {
     let n = BigUint::from_str_radix(&skde_params.n, 10)

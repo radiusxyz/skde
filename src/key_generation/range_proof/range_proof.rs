@@ -1,10 +1,10 @@
+use std::{env, time::Instant};
+
 use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use risc0_zkvm::{
     get_prover_server, ExecutorEnv, ExecutorImpl, ProveInfo, ProverOpts, Receipt, VerifierContext,
 };
-use std::env;
-use std::time::Instant;
 
 /// ELF binary for range proof execution
 pub const RANGE_PROOF_ELF: &[u8] = include_bytes!(concat!(
