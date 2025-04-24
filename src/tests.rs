@@ -13,10 +13,11 @@ mod tests {
         key_aggregation::aggregate_key,
         key_generation::{
             generate_partial_key, prove_partial_key_validity,
-            range_proof::{
+            zk_range_proof::{
                 generate_range_proof, verify_proofs, verify_proofs_parallel, verify_range_proof,
                 RangeProofInput, BASE, EXPONENT, MODULUS, RANGE,
             },
+            sigma_proof::{generate_sigma_proof, verify_sigma_proof},
             verify_partial_key_validity,
         },
         BIT_LEN, GENERATOR, MAX_SEQUENCER_NUMBER, TIME_PARAM_T,
@@ -81,7 +82,7 @@ mod tests {
     fn run_encryption_benchmark(
         hybrid: bool,
         message_len: usize,
-        generate_range_proofs: bool,
+        include_range_proofs: bool,
     ) -> BenchmarkResult {
         // Set skde parameters
         let skde_params = default_skde_params();
@@ -91,19 +92,13 @@ mod tests {
         let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
             .map(|_| {
                 let (secret, partial) = generate_partial_key(&skde_params).unwrap();
-                let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
-                assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
 
-                if generate_range_proofs {
-                    println!("Generating range proof for partial key: {}", partial.u);
-                    let range_proof = generate_range_proof(&RangeProofInput::new(
-                        BigUint::from_str(&skde_params.g).unwrap(),
-                        BigUint::from_str(&skde_params.n).unwrap(),
-                        secret.r + secret.s,
-                        BigUint::from_str(RANGE).unwrap(),
-                    ))
-                    .unwrap();
-                    verify_range_proof(partial.u.clone(), &range_proof.receipt).unwrap();
+                if include_range_proofs {
+                    let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
+                    assert!(verify_partial_key_validity(&skde_params, &partial, &proof).unwrap());
+                } else {
+                    let proof = generate_sigma_proof(&skde_params, &secret).unwrap();
+                    assert!(verify_sigma_proof(&skde_params, &partial, &proof).unwrap());
                 }
 
                 partial
@@ -140,6 +135,57 @@ mod tests {
             ciphertext_size,
         }
     }
+
+    // fn run_encryption_benchmark(
+    //     hybrid: bool,
+    //     message_len: usize,
+    //     generate_range_proofs: bool,
+    // ) -> BenchmarkResult {
+    //     // Set skde parameters
+    //     let skde_params = default_skde_params();
+    //     let message = generate_random_message(message_len);
+
+    //     // Generate partial keys & Verify all
+    //     let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
+    //         .map(|_| {
+    //             let (secret, partial) =
+    // generate_partial_key(&skde_params).unwrap();             let proof =
+    // prove_partial_key_validity(&skde_params, &secret).unwrap();             
+    // assert!(verify_partial_key_validity(&skde_params, &partial.clone(),
+    // &proof).unwrap());             partial
+    //         })
+    //         .collect();
+
+    //     // Aggregate key
+    //     let aggregated_key = aggregate_key(&skde_params, &partial_keys);
+    //     let encryption_key = aggregated_key.u.clone();
+
+    //     // Encryption
+    //     let t1 = Instant::now();
+    //     let ciphertext = encrypt(&skde_params, &message, &encryption_key,
+    // hybrid).unwrap();     let encryption_time = t1.elapsed();
+    //     let ciphertext_size = ciphertext.len();
+
+    //     // Puzzle solve
+    //     let t2 = Instant::now();
+    //     let secret_key = solve_time_lock_puzzle(&skde_params,
+    // &aggregated_key).unwrap();     let puzzle_time = t2.elapsed();
+
+    //     // Decryption
+    //     let t3 = Instant::now();
+    //     let decrypted = decrypt(&skde_params, &ciphertext,
+    // &secret_key.sk).unwrap();     let decryption_time = t3.elapsed();
+
+    //     assert_eq!(message, decrypted);
+
+    //     BenchmarkResult {
+    //         message_len,
+    //         encryption_time,
+    //         puzzle_time,
+    //         decryption_time,
+    //         ciphertext_size,
+    //     }
+    // }
 
     fn print_benchmark_results(results: &[(BenchmarkResult, BenchmarkResult)], title: &str) {
         println!("\n=== Benchmark Results {} ===", title);
@@ -300,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn test_secret_key_validation() {
+    fn test_secret_key_sigma_validation() {
         // 1. Set up SKDE parameters
         let skde_params = default_skde_params();
 
@@ -308,8 +354,8 @@ mod tests {
         let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
             .map(|_| {
                 let (secret, partial) = generate_partial_key(&skde_params).unwrap();
-                let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
-                assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
+                let proof = generate_sigma_proof(&skde_params, &secret).unwrap();
+                assert!(verify_sigma_proof(&skde_params, &partial.clone(), &proof).unwrap());
                 partial
             })
             .collect();

@@ -13,7 +13,6 @@ use super::{
 use crate::{SkdeParams, BIT_LEN, MAX_SEQUENCER_NUMBER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-
 pub struct SigmaProof {
     pub a: BigUint,
     pub b: BigUint,
@@ -115,8 +114,8 @@ pub fn generate_sigma_proof(
 /// These equations are evaluated in parallel and compared.
 pub fn verify_sigma_proof(
     skde_params: &SkdeParams,
-    partial_key: PartialKey,
-    partial_key_proof: SigmaProof,
+    partial_key: &PartialKey,
+    partial_key_proof: &SigmaProof,
 ) -> Result<bool> {
     let n = BigUint::from_str_radix(&skde_params.n, 10)
         .context(format!("Failed to parse n parameter: {}", skde_params.n))?;
@@ -129,11 +128,11 @@ pub fn verify_sigma_proof(
     let t = BigUint::from(skde_params.t);
     let one_big = BigUint::from(1u32);
 
-    let a = partial_key_proof.a;
-    let b = partial_key_proof.b;
-    let tau = partial_key_proof.tau;
-    let alpha = partial_key_proof.alpha;
-    let beta = partial_key_proof.beta;
+    let a = &partial_key_proof.a;
+    let b = &partial_key_proof.b;
+    let tau = &partial_key_proof.tau;
+    let alpha = &partial_key_proof.alpha;
+    let beta = &partial_key_proof.beta;
 
     let u = &partial_key.u;
     let v = &partial_key.v;
@@ -144,26 +143,26 @@ pub fn verify_sigma_proof(
     let transcript = vec![&n, &g, &t, &h, &a, &b, &tau];
     let e = calculate_challenge(&transcript);
 
-    let h_exp_nalpha = big_pow_mod(&h, &(&alpha * &n), &n_square);
-    let n_plus_one_exp_beta = big_pow_mod(&(&n + &one_big), &beta, &n_square);
+    let h_exp_nalpha = big_pow_mod(&h, &(alpha * n.clone()), &n_square);
+    let n_plus_one_exp_beta = big_pow_mod(&(n.clone() + one_big), beta, &n_square);
 
-    let uy = big_mul_mod(u, y, &n);
+    let uy = big_mul_mod(u, y, &n.clone());
     let vw = big_mul_mod(v, w, &n_square);
 
     // Parallel computation of lhs and rhs vectors
     let (lhs, rhs): (Vec<BigUint>, Vec<BigUint>) = rayon::join(
         || {
             vec![
-                big_pow_mod(&g, &alpha, &n),
+                big_pow_mod(&g, alpha, &n),
                 big_mul_mod(&h_exp_nalpha, &n_plus_one_exp_beta, &n_square),
-                big_pow_mod(&g, &beta, &n),
+                big_pow_mod(&g, beta, &n),
             ]
         },
         || {
             vec![
-                big_mul_mod(&big_pow_mod(&uy, &e, &n), &a, &n),
-                big_mul_mod(&big_pow_mod(&vw, &e, &n_square), &b, &n_square),
-                big_mul_mod(&big_pow_mod(u, &e, &n), &tau, &n),
+                big_mul_mod(&big_pow_mod(&uy, &e, &n), a, &n),
+                big_mul_mod(&big_pow_mod(&vw, &e, &n_square), b, &n_square),
+                big_mul_mod(&big_pow_mod(u, &e, &n), tau, &n),
             ]
         },
     );
@@ -195,7 +194,7 @@ pub fn calculate_challenge(values: &[&BigUint]) -> BigUint {
     let mut sha = Sha512::new();
 
     for value in values {
-        sha.update(&value.to_bytes_be());
+        sha.update(value.to_bytes_be());
     }
 
     let hash = sha.finalize();

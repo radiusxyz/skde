@@ -1,5 +1,5 @@
 mod partial_key_validity;
-pub mod range_proof;
+pub mod zk_range_proof;
 pub mod sigma_proof;
 mod types;
 

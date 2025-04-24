@@ -9,7 +9,7 @@ use risc0_zkvm::{
 /// ELF binary for range proof execution
 pub const RANGE_PROOF_ELF: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/src/key_generation/range_proof/range_proof.bin"
+    "/src/key_generation/zk_range_proof/range_proof.bin"
 ));
 
 /// Unique ID used for range proof ELF
@@ -49,7 +49,7 @@ impl RangeProofInput {
 }
 
 /// Output for range proof execution results
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct RangeProofOutput {
     pub base: BigUint,
     pub modulus: BigUint,
