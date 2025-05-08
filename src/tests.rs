@@ -274,7 +274,7 @@ mod tests {
         let mut results: Vec<(BenchmarkResult, BenchmarkResult)> = Vec::new();
 
         println!("Running benchmarks WITHOUT range proofs");
-        for &len in &[64, 128, 256, 512, 1024, 2048] {
+        for &len in &[64; 100] {
             let standard = run_encryption_benchmark(false, len, false);
             let hybrid = run_encryption_benchmark(true, len, false);
             results.push((standard, hybrid));
@@ -297,31 +297,83 @@ mod tests {
 
         print_benchmark_results(&results, "WITH Range Proofs");
     }
-
     #[test]
-    fn test_secret_key_validation() {
-        // 1. Set up SKDE parameters
-        let skde_params = default_skde_params();
+    fn test_secret_key_validation_stress() {
+        const NUM_ITERATIONS: usize = 100;
+        let mut success_count = 0;
+        let mut failure_logs = Vec::new();
 
-        // 2. Generate partial keys and verify
-        let partial_keys: Vec<_> = (0..MAX_SEQUENCER_NUMBER)
-            .map(|_| {
-                let (secret, partial) = generate_partial_key(&skde_params).unwrap();
-                let proof = prove_partial_key_validity(&skde_params, &secret).unwrap();
-                assert!(verify_partial_key_validity(&skde_params, partial.clone(), proof).unwrap());
-                partial
-            })
-            .collect();
+        for i in 0..NUM_ITERATIONS {
+            let skde_params = default_skde_params();
 
-        // 3. Aggregate public keys and solve puzzle
-        let aggregated_key = aggregate_key(&skde_params, &partial_keys);
-        let encryption_key = aggregated_key.u.clone();
-        let secret_key =
-            solve_time_lock_puzzle(&skde_params, &aggregated_key).expect("Puzzle solving failed");
+            let partial_keys_result: Result<Vec<_>, _> = (0..MAX_SEQUENCER_NUMBER)
+                .map(|_| {
+                    let (secret, partial) = generate_partial_key(&skde_params)?;
+                    let proof = prove_partial_key_validity(&skde_params, &secret)?;
+                    let is_valid =
+                        verify_partial_key_validity(&skde_params, partial.clone(), proof)?;
+                    if is_valid {
+                        Ok(partial)
+                    } else {
+                        Err(anyhow::anyhow!("Partial key verification failed"))
+                    }
+                })
+                .collect();
 
-        // 4. Validate the secret key
-        let is_valid = validate_secret_key(&skde_params, &encryption_key, &secret_key.sk, true);
+            match partial_keys_result {
+                Ok(partial_keys) => {
+                    let aggregated_key = aggregate_key(&skde_params, &partial_keys);
+                    let encryption_key = aggregated_key.u.clone();
+                    match solve_time_lock_puzzle(&skde_params, &aggregated_key) {
+                        Ok(secret_key) => {
+                            let is_valid = validate_secret_key(
+                                &skde_params,
+                                &encryption_key,
+                                &secret_key.sk,
+                                true,
+                            );
+                            if is_valid {
+                                success_count += 1;
+                            } else {
+                                failure_logs
+                                    .push(format!("Iteration {}: invalid secret key", i + 1));
+                            }
+                        }
+                        Err(e) => {
+                            failure_logs.push(format!(
+                                "Iteration {}: puzzle solve failed: {:?}",
+                                i + 1,
+                                e
+                            ));
+                        }
+                    }
+                }
+                Err(e) => {
+                    failure_logs.push(format!(
+                        "Iteration {}: partial key/proof failed: {:?}",
+                        i + 1,
+                        e
+                    ));
+                }
+            }
+        }
 
-        assert!(is_valid, "Secret key validation failed");
+        println!("\n==== Stress Test Summary ====");
+        println!("Successful validations: {}", success_count);
+        println!("Failed validations:     {}", failure_logs.len());
+
+        if !failure_logs.is_empty() {
+            println!("\nFailure details:");
+            for log in &failure_logs {
+                println!("- {}", log);
+            }
+        }
+
+        assert!(
+            failure_logs.is_empty(),
+            "Some iterations failed: {} out of {}",
+            failure_logs.len(),
+            NUM_ITERATIONS
+        );
     }
 }
